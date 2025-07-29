@@ -3,20 +3,36 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ESP8266WebServer.h>
-#include <Wire.h> // Save Arduino's DEFAULT definition before including SparkFun library
-#ifdef DEFAULT
-#define SAVED_DEFAULT DEFAULT
+#include <Wire.h>
+
+// Handle DEFAULT definition conflicts with SparkFun library
+// The SparkFun STUSB4500 library defines DEFAULT as 0xFF in
+// stusb4500_register_map.h We need to be careful with any DEFAULT definitions
+// in the Arduino core
+#pragma push_macro("DEFAULT")
 #undef DEFAULT
-#endif
 
 // Include the SparkFun library
 #include <SparkFun_STUSB4500.h>
 
-// Restore Arduino's DEFAULT definition after including SparkFun library
-#ifdef SAVED_DEFAULT
-#define DEFAULT SAVED_DEFAULT
-#undef SAVED_DEFAULT
+// Restore the original DEFAULT definition if it existed
+#pragma pop_macro("DEFAULT")
+
+// Use appropriate WebServer library based on board
+#if defined(ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#include <WebServer.h>
+typedef WebServer WebServerClass;
+#elif defined(ESP8266)
+#include <ESP8266WebServer.h>
+typedef ESP8266WebServer WebServerClass;
+#else
+#include <WebServer.h>
+typedef WebServer WebServerClass;
+#endif
+#elif defined(ESP8266)
+#include <ESP8266WebServer.h>
+typedef ESP8266WebServer WebServerClass;
 #endif
 
 class USBPDController {
@@ -30,7 +46,7 @@ public:
   void handle();
 
   // Register web handlers to the provided server
-  void setupWebHandlers(ESP8266WebServer &server);
+  void setupWebHandlers(WebServerClass &server);
 
   // Check if PD board is connected
   bool isPDBoardConnected();
@@ -53,13 +69,13 @@ private:
   uint8_t i2cAddress;
 
   // Web handler methods
-  void handlePDStatus(ESP8266WebServer &server);
-  void handleAvailableVoltages(ESP8266WebServer &server);
-  void handleAvailableCurrents(ESP8266WebServer &server);
-  void handlePDOProfiles(ESP8266WebServer &server);
-  void handleSetPDConfig(ESP8266WebServer &server);
-  void handleRoot(ESP8266WebServer &server);
-  void handleSetup(ESP8266WebServer &server);
+  void handlePDStatus(WebServerClass &server);
+  void handleAvailableVoltages(WebServerClass &server);
+  void handleAvailableCurrents(WebServerClass &server);
+  void handlePDOProfiles(WebServerClass &server);
+  void handleSetPDConfig(WebServerClass &server);
+  void handleRoot(WebServerClass &server);
+  void handleSetup(WebServerClass &server);
 };
 
 // Global instance

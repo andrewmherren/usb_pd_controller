@@ -1,6 +1,6 @@
 # USB-C Power Delivery Controller
 
-A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP8266 microcontroller and the SparkFun STUSB4500 breakout board. This library allows you to configure voltage and current output for connected USB-C devices over a user-friendly web interface.
+A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP8266 or ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. This library allows you to configure voltage and current output for connected USB-C devices over a user-friendly web interface.
 
 ## Features
 
@@ -13,21 +13,36 @@ A web-based interface for controlling USB-C Power Delivery (PD) settings through
 
 ## Hardware Requirements
 
-- ESP8266-based board (NodeMCU, Wemos D1, etc.)
+- ESP8266-based board (NodeMCU, Wemos D1, etc.) or ESP32-S3 board
 - [SparkFun USB-C Power Delivery Board (STUSB4500)](https://www.sparkfun.com/products/15801)
 - USB-C PD compliant power supply
 - USB-C device to power
 
 ## Wiring
 
+### ESP8266 Wiring
+
 Connect the SparkFun STUSB4500 board to your ESP8266:
 
-| ESP8266 | STUSB4500 |
-|---------|-----------|
-| 3.3V    | 3.3V      |
-| GND     | GND       |
-| D1 (GPIO 5) | SCL   |
-| D2 (GPIO 4) | SDA   |
+| ESP8266     | STUSB4500 |
+|-------------|-----------|
+| 3.3V        | 3.3V      |
+| GND         | GND       |
+| D1 (GPIO 5) | SCL       |
+| D2 (GPIO 4) | SDA       |
+
+### ESP32-S3 Wiring
+
+Connect the SparkFun STUSB4500 board to your ESP32-S3:
+
+| ESP32-S3 | STUSB4500 |
+|----------|-----------|
+| 3.3V     | 3.3V      |
+| GND      | GND       |
+| GPIO 5   | SCL       |
+| GPIO 4   | SDA       |
+
+**Note:** The default I2C pins on ESP32-S3 are GPIO 9 (SCL) and GPIO 8 (SDA), but you can use any pins by calling `Wire.begin(SDA_PIN, SCL_PIN)` before initializing the USB PD controller.
 
 ## Installation
 
@@ -68,7 +83,11 @@ void setup() {
   usbPDController.begin();
   
   // If you're using WiFi, set up a web server
-  ESP8266WebServer server(80);
+  #if defined(ESP8266)
+    ESP8266WebServer server(80);
+  #else
+    WebServer server(80);  // For ESP32-S3
+  #endif
   
   // Add USB PD controller web handlers to your server
   usbPDController.setupWebHandlers(server);
@@ -86,7 +105,9 @@ void loop() {
 
 ### Integration with Web Server
 
-This library can be integrated with any ESP8266WebServer instance:
+This library can be integrated with any ESP8266WebServer or WebServer (ESP32) instance:
+
+#### ESP8266 Example
 
 ```cpp
 #include <Arduino.h>
@@ -138,6 +159,48 @@ void loop() {
 }
 ```
 
+#### ESP32-S3 Example
+
+```cpp
+#include <Arduino.h>
+#include <Wire.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <usb_pd_controller.h>
+#include <wifi_ap.h>
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Initialize I2C - optionally specify pins for ESP32-S3
+  // Default ESP32-S3 I2C pins are GPIO9 (SCL) and GPIO8 (SDA)
+  Wire.begin(8, 9);  
+  
+  // Initialize the WiFi manager and USB PD controller after WiFi connects
+  wifiManager.onSetupComplete([]() {
+    // Initialize USB PD controller
+    usbPDController.begin();
+    
+    // Get reference to the web server
+    WebServer &server = wifiManager.getWebServer();
+    
+    // Setup USB PD controller web handlers
+    usbPDController.setupWebHandlers(server);
+  });
+  
+  // Start WiFi setup with automatic portal if needed
+  wifiManager.begin("USB-PD-Setup", true);
+}
+
+void loop() {
+  // Handle WiFi operations
+  wifiManager.handle();
+  
+  // Handle USB PD controller operations
+  usbPDController.handle();
+}
+```
+
 ## Web Interface
 
 The library provides a responsive web interface for controlling USB-C PD settings:
@@ -181,14 +244,32 @@ The STUSB4500 chip can negotiate with USB-C PD power supplies to request specifi
 
 - Wire library (for I2C communication)
 - SparkFun STUSB4500 Arduino Library
-- ESP8266WebServer library
+- ESP8266WebServer library (for ESP8266 boards)
+- WebServer library (for ESP32-S3 boards)
 - ArduinoJson library (for API responses)
+- WiFi library (for wireless connectivity)
+- DNSServer library (for captive portal in setup mode)
+
+## Installation
+
+1. Install the required libraries through the Arduino Library Manager:
+   - ArduinoJson (by Benoit Blanchon)
+   - SparkFun STUSB4500 Arduino Library (by SparkFun)
+   
+2. Create a new project with the appropriate board selected:
+   - For ESP8266: Select your ESP8266 board type (NodeMCU, Wemos D1, etc.)
+   - For ESP32-S3: Select "ESP32S3 Dev Module" or your specific ESP32-S3 board
+   
+3. Add the USB PD Controller and WiFi AP modules to your project:
+   - Copy the `lib/usb_pd_controller` and `lib/wifi_ap` folders to your project's library folder
+   
+4. Use the example code as a starting point for your project
 
 ## License
 
 MIT License
 
-Copyright (c) 2023 Your Name
+Copyright (c) 2023-2024 Your Name
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

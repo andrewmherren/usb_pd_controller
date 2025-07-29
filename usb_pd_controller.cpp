@@ -6,7 +6,6 @@
 USBPDController usbPDController;
 
 // USBPDController implementation
-
 USBPDController::USBPDController()
     : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
       lastCheckTime(0), i2cAddress(0x28) {}
@@ -57,7 +56,7 @@ void USBPDController::handle() {
   }
 }
 
-void USBPDController::setupWebHandlers(ESP8266WebServer &server) {
+void USBPDController::setupWebHandlers(WebServerClass &server) {
   Serial.println("Setting up USB PD web handlers...");
 
   // Main device control interface
@@ -193,11 +192,11 @@ String USBPDController::getAllPDOProfiles() {
 
 // Web handler implementations
 
-void USBPDController::handleRoot(ESP8266WebServer &server) {
+void USBPDController::handleRoot(WebServerClass &server) {
   server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
 }
 
-void USBPDController::handlePDStatus(ESP8266WebServer &server) {
+void USBPDController::handlePDStatus(WebServerClass &server) {
   // Check if PD board is connected
   bool connected = isPDBoardConnected();
 
@@ -230,15 +229,15 @@ void USBPDController::handlePDStatus(ESP8266WebServer &server) {
   server.send(200, "application/json", response);
 }
 
-void USBPDController::handleAvailableVoltages(ESP8266WebServer &server) {
+void USBPDController::handleAvailableVoltages(WebServerClass &server) {
   server.send(200, "application/json", "[5.0, 9.0, 12.0, 15.0, 20.0]");
 }
 
-void USBPDController::handleAvailableCurrents(ESP8266WebServer &server) {
+void USBPDController::handleAvailableCurrents(WebServerClass &server) {
   server.send(200, "application/json", "[0.5, 1.0, 1.5, 2.0, 2.5, 3.0]");
 }
 
-void USBPDController::handlePDOProfiles(ESP8266WebServer &server) {
+void USBPDController::handlePDOProfiles(WebServerClass &server) {
   if (!isPDBoardConnected()) {
     server.send(503, "application/json",
                 "{\"success\":false,\"message\":\"PD board not connected\"}");
@@ -249,7 +248,7 @@ void USBPDController::handlePDOProfiles(ESP8266WebServer &server) {
   server.send(200, "application/json", response);
 }
 
-void USBPDController::handleSetPDConfig(ESP8266WebServer &server) {
+void USBPDController::handleSetPDConfig(WebServerClass &server) {
   String postBody = server.arg("plain");
   Serial.println("Received config: " + postBody);
 
@@ -294,7 +293,7 @@ void USBPDController::handleSetPDConfig(ESP8266WebServer &server) {
         "{\"success\":false,\"message\":\"Failed to set configuration\"}");
   }
 }
-void USBPDController::handleSetup(ESP8266WebServer &server) {
+void USBPDController::handleSetup(WebServerClass &server) {
   String response =
       "Starting WiFi configuration portal. Please connect to the WiFi "
       "network named \"" +
