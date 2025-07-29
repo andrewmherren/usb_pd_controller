@@ -196,6 +196,15 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
   <script>
 // Get current configuration on page load
 window.onload = function() {
+  // Initialize with the assumption that device is not connected yet
+  document.getElementById('currentVoltage').innerText = 'Loading...';
+  document.getElementById('currentCurrent').innerText = 'Loading...';
+  document.getElementById('currentPower').innerText = 'Loading...';
+  document.getElementById('statusMessage').className = 'status-message info';
+  document.getElementById('statusMessage').innerText = 'Checking device status...';
+  document.getElementById('statusMessage').classList.remove('hidden');
+  document.getElementById('configSection').classList.add('hidden');
+  
   fetchCurrentConfig();
   loadAvailableOptions();
   loadPDOProfiles();
@@ -205,6 +214,7 @@ function fetchCurrentConfig() {
   // Show loading state
   document.getElementById('currentVoltage').innerText = 'Loading...';
   document.getElementById('currentCurrent').innerText = 'Loading...';
+  document.getElementById('currentPower').innerText = 'Loading...';
   document.getElementById('statusMessage').className = 'status-message info';
   document.getElementById('statusMessage').innerText = 'Checking device status...';
   document.getElementById('statusMessage').classList.remove('hidden');
@@ -230,10 +240,6 @@ function fetchCurrentConfig() {
         document.getElementById('retryContainer').classList.add('hidden');
         setFormEnabled(true);
         
-        // Hide status message after 3 seconds
-        setTimeout(function() {
-          document.getElementById('statusMessage').classList.add('hidden');
-        }, 3000);
       } else {
         // Error case - PD board not connected or values not read
         document.getElementById('currentVoltage').innerText = 'N/A';
