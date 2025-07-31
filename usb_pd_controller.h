@@ -56,9 +56,11 @@ public:
 
   // Set new PD configuration
   bool setPDConfig(float voltage, float current);
-
   // Get all PDO profiles as JSON string
   String getAllPDOProfiles();
+
+  // Render the home page for external use (HTTPS server)
+  void renderHomePage(String &output);
 
 private:
   STUSB4500 pdController; // Current PD settings

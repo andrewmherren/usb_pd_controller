@@ -193,7 +193,18 @@ String USBPDController::getAllPDOProfiles() {
 // Web handler implementations
 
 void USBPDController::handleRoot(WebServerClass &server) {
+  // Add headers to prevent browser caching and HSTS issues when switching
+  // between HTTP/HTTPS
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  server.sendHeader("Pragma", "no-cache");
+  server.sendHeader("Expires", "0");
+
   server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
+}
+
+void USBPDController::renderHomePage(String &output) {
+  // Copy the HTML content from PROGMEM to a String
+  output = FPSTR(USB_PD_CONTROLLER_HTML);
 }
 
 void USBPDController::handlePDStatus(WebServerClass &server) {
