@@ -4,91 +4,177 @@
 // Embedded HTML content for USB PD device control interface
 const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>USB-C Power Delivery Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 { color: #0066cc; }
-    .status-card {
-      background-color: #f5f5f5;
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 20px;
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: white;
     }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 30px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .status-card {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .status-card h3 {
+      margin: 0 0 10px 0;
+      color: #fff;
+      font-size: 1.2em;
+    }
+    .status-card p {
+      margin: 5px 0;
+      opacity: 0.9;
+    }
+    .success { color: #4CAF50; font-weight: bold; }
+    .info { color: #2196F3; font-weight: bold; }
+    .warning { color: #FF9800; font-weight: bold; }
+    .error { color: #f44336; font-weight: bold; }
+    
     .form-group {
       margin-bottom: 15px;
     }
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 8px;
       font-weight: bold;
+      color: #fff;
     }
     .form-control {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
       box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      backdrop-filter: blur(5px);
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .form-control option {
+      background: #764ba2;
+      color: white;
+    }
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+    .nav-links a {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+    }
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
     }
     .button-group {
       display: flex;
-      gap: 10px;
+      gap: 15px;
       margin-top: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
     .btn {
-      padding: 10px 15px;
+      padding: 12px 24px;
       border: none;
-      border-radius: 4px;
+      border-radius: 25px;
       cursor: pointer;
       font-weight: bold;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.3);
     }
     .btn-primary {
-      background-color: #0066cc;
+      background: rgba(76, 175, 80, 0.8);
       color: white;
     }
     .btn-primary:hover {
-      background-color: #0055aa;
+      background: rgba(76, 175, 80, 1);
+      transform: translateY(-2px);
     }
     .btn-secondary {
-      background-color: #f0f0f0;
-      color: #333;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
     }
     .btn-secondary:hover {
-      background-color: #ddd;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
     }
     .btn-warning {
-      background-color: #ff9900;
+      background: rgba(255, 152, 0, 0.8);
       color: white;
     }
     .btn-warning:hover {
-      background-color: #ff8800;
+      background: rgba(255, 152, 0, 1);
+      transform: translateY(-2px);
     }
     .footer {
-      margin-top: 30px;
-      font-size: 0.8em;
-      color: #666;
       text-align: center;
+      margin-top: 40px;
+      opacity: 0.7;
+      font-size: 0.9em;
     }
     .status-message {
-      padding: 10px;
-      border-radius: 4px;
-      margin-top: 10px;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
       font-weight: bold;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    .error {
-      background-color: #ffeeee;
-      color: #cc0000;
+    .status-message.error {
+      background: rgba(244, 67, 54, 0.2);
+      border-color: rgba(244, 67, 54, 0.5);
+      color: #ffcdd2;
     }
-    .success {
-      background-color: #eeffee;
-      color: #008800;
+    .status-message.success {
+      background: rgba(76, 175, 80, 0.2);
+      border-color: rgba(76, 175, 80, 0.5);
+      color: #c8e6c9;
     }
-    .info {
-      background-color: #eeeeff;
-      color: #0000cc;
+    .status-message.info {
+      background: rgba(33, 150, 243, 0.2);
+      border-color: rgba(33, 150, 243, 0.5);
+      color: #bbdefb;
     }
     .hidden {
       display: none;
@@ -100,18 +186,19 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
       margin-bottom: 20px;
     }
     .pdo-card {
-      border: 2px solid #ddd;
-      border-radius: 8px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
       padding: 15px;
-      background-color: #f9f9f9;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(5px);
     }
     .pdo-card.active {
-      border-color: #0066cc;
-      background-color: #e6f3ff;
+      border-color: rgba(76, 175, 80, 0.8);
+      background: rgba(76, 175, 80, 0.2);
     }
     .pdo-card.fixed {
-      border-color: #ff9900;
-      background-color: #fff3e6;
+      border-color: rgba(255, 152, 0, 0.8);
+      background: rgba(255, 152, 0, 0.2);
     }
     .pdo-header {
       font-weight: bold;
@@ -119,54 +206,62 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
       display: flex;
       justify-content: space-between;
       align-items: center;
+      color: #fff;
     }
     .pdo-badge {
-      background-color: #0066cc;
+      background: rgba(33, 150, 243, 0.8);
       color: white;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.8em;
+      padding: 4px 12px;
+      border-radius: 15px;
+      font-size: 0.75em;
+      font-weight: bold;
     }
     .pdo-badge.fixed {
-      background-color: #ff9900;
+      background: rgba(255, 152, 0, 0.8);
+    }
+    .pdo-badge.active {
+      background: rgba(76, 175, 80, 0.8);
     }
     .pdo-details {
       font-size: 0.9em;
       line-height: 1.4;
+      color: rgba(255, 255, 255, 0.9);
     }
     .refresh-button {
       margin-left: 10px;
-      padding: 5px 10px;
+      padding: 8px 16px;
       font-size: 0.8em;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>USB-C Power Delivery Control</h1>
+    <h1>⚡ USB-C Power Delivery Control</h1>
     
-    <div class="status-card">
-      <h2>Current Status</h2>
-      <p>Active Voltage: <span id="currentVoltage">Loading...</span>V</p>
-      <p>Active Current: <span id="currentCurrent">Loading...</span>A</p>
-      <p>Active Power: <span id="currentPower">Loading...</span>W</p>
-      <div id="statusMessage" class="status-message hidden"></div>
-      <div id="retryContainer" class="button-group hidden">
-        <button id="retryBtn" class="btn btn-warning">Retry Connection</button>
+    <div class="status-grid">
+      <div class="status-card">
+        <h3>Current Status</h3>
+        <p>Voltage: <span id="currentVoltage" class="info">Loading...</span>V</p>
+        <p>Current: <span id="currentCurrent" class="info">Loading...</span>A</p>
+        <p>Power: <span id="currentPower" class="info">Loading...</span>W</p>
+        <div id="statusMessage" class="status-message hidden"></div>
+        <div id="retryContainer" class="button-group hidden">
+          <button id="retryBtn" class="btn btn-warning">🔄 Retry Connection</button>
+        </div>
       </div>
     </div>
     
     <div class="status-card">
-      <h2>PDO Profiles 
-        <button id="refreshPDOBtn" class="btn btn-secondary refresh-button">Refresh</button>
-      </h2>
+      <h3>PDO Profiles 
+        <button id="refreshPDOBtn" class="btn btn-secondary refresh-button">🔄 Refresh</button>
+      </h3>
       <div id="pdoProfiles" class="pdo-container">
         <div>Loading PDO profiles...</div>
       </div>
     </div>
     
-    <div id="configSection" class="config-section">
-      <h2>Set New Configuration</h2>
+    <div id="configSection" class="status-card config-section">
+      <h3>⚙️ Set New Configuration</h3>
       <div class="form-group">
         <label for="voltageSelect">Voltage:</label>
         <select id="voltageSelect" class="form-control">
@@ -182,14 +277,20 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
       </div>
       
       <div class="button-group">
-        <button id="applyBtn" class="btn btn-primary">Apply</button>
-        <button id="cancelBtn" class="btn btn-secondary">Cancel</button>
+        <button id="applyBtn" class="btn btn-primary">✅ Apply Configuration</button>
+        <button id="cancelBtn" class="btn btn-secondary">❌ Cancel</button>
       </div>
     </div>
     
+    <div class="nav-links">
+      <a href="/">🏠 Home</a>
+      <a href="/wifi">📡 WiFi Settings</a>
+      <a href="/web_router">🚀 Web Router Status</a>
+    </div>
+    
     <div class="footer">
-      <p>USB-C PD Control</p>
-      <p><a href="/wifi">WiFi Setup</a></p>
+      <p>USB-C Power Delivery Controller</p>
+      <p>Unified web interface via Web Router</p>
     </div>
   </div>
 
@@ -420,7 +521,7 @@ function loadPDOProfiles() {
       let html = '';
       data.pdos.forEach(pdo => {
         const cardClass = pdo.active ? 'pdo-card active' : (pdo.fixed ? 'pdo-card fixed' : 'pdo-card');
-        const badgeClass = pdo.fixed ? 'pdo-badge fixed' : 'pdo-badge';
+        const badgeClass = pdo.active ? 'pdo-badge active' : (pdo.fixed ? 'pdo-badge fixed' : 'pdo-badge');
         const badgeText = pdo.active ? 'ACTIVE' : (pdo.fixed ? 'FIXED' : 'AVAILABLE');
         
         html += `

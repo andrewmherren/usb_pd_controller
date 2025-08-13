@@ -1,6 +1,5 @@
 #include "usb_pd_controller.h"
 #include "usb_pd_controller_web.h"
-#include <wifi_ap.h>
 
 // Create global instance of USBPDController
 USBPDController usbPDController;
@@ -34,8 +33,13 @@ void USBPDController::begin(uint8_t i2cAddress) {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
 }
-
 void USBPDController::handle() {
+  // This method is kept for backward compatibility
+  // The actual work is now done in handleLoop()
+  handleLoop();
+}
+
+void USBPDController::handleLoop() {
   // Periodically check if PD board connection status has changed
   if (millis() - lastCheckTime > 5000) { // Check every 5 seconds
     lastCheckTime = millis();
@@ -55,32 +59,72 @@ void USBPDController::handle() {
     }
   }
 }
+void USBPDController::registerRoutes(WebRouter &router, const char *basePath) {
+  Serial.print("Registering USB PD Controller routes with base path: ");
+  Serial.println(basePath);
 
-void USBPDController::setupWebHandlers(WebServerClass &server) {
-  Serial.println("Setting up USB PD web handlers...");
+  // Register main page route
+  String mainPath = String(basePath);
+  if (!mainPath.endsWith("/"))
+    mainPath += "/";
 
-  // Main device control interface
-  server.on("/", [this, &server]() { this->handleRoot(server); });
+  router.addRoute(mainPath.c_str(), HTTP_GET, [this](WebServerClass &server) {
+    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server.sendHeader("Pragma", "no-cache");
+    server.sendHeader("Expires", "0");
+    server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
+  });
 
-  // API endpoints for USB-PD control
-  server.on("/pd-status", HTTP_GET,
-            [this, &server]() { this->handlePDStatus(server); });
+  // Register API endpoints with base path
+  String pdStatusPath = String(basePath) + "/pd-status";
+  router.addRoute(pdStatusPath.c_str(), HTTP_GET,
+                  [this](WebServerClass &server) {
+                    String response = this->handlePDStatusAPI();
+                    server.send(200, "application/json", response);
+                  });
 
-  server.on("/available-voltages", HTTP_GET,
-            [this, &server]() { this->handleAvailableVoltages(server); });
+  String voltagesPath = String(basePath) + "/available-voltages";
+  router.addRoute(voltagesPath.c_str(), HTTP_GET,
+                  [this](WebServerClass &server) {
+                    String response = this->handleAvailableVoltagesAPI();
+                    server.send(200, "application/json", response);
+                  });
 
-  server.on("/available-currents", HTTP_GET,
-            [this, &server]() { this->handleAvailableCurrents(server); });
+  String currentsPath = String(basePath) + "/available-currents";
+  router.addRoute(currentsPath.c_str(), HTTP_GET,
+                  [this](WebServerClass &server) {
+                    String response = this->handleAvailableCurrentsAPI();
+                    server.send(200, "application/json", response);
+                  });
 
-  // API endpoint for PDO profiles
-  server.on("/pdo-profiles", HTTP_GET,
-            [this, &server]() { this->handlePDOProfiles(server); });
+  String profilesPath = String(basePath) + "/pdo-profiles";
+  router.addRoute(profilesPath.c_str(), HTTP_GET,
+                  [this](WebServerClass &server) {
+                    String response = this->handlePDOProfilesAPI();
+                    server.send(200, "application/json", response);
+                  });
 
-  server.on("/set-pd-config", HTTP_POST,
-            [this, &server]() { this->handleSetPDConfig(server); });
+  String configPath = String(basePath) + "/set-pd-config";
+  router.addRoute(configPath.c_str(), HTTP_POST,
+                  [this](WebServerClass &server) {
+                    String jsonBody = server.arg("plain");
+                    String response = this->handleSetPDConfigAPI(jsonBody);
 
-  // Access to WiFi setup from normal operation
-  server.on("/setup", [this, &server]() { this->handleSetup(server); });
+                    // Determine response code based on response content
+                    int responseCode = 200;
+                    if (response.indexOf("\"success\":false") >= 0) {
+                      if (response.indexOf("Invalid JSON") >= 0 ||
+                          response.indexOf("Invalid values") >= 0) {
+                        responseCode = 400;
+                      } else if (response.indexOf("not connected") >= 0) {
+                        responseCode = 503;
+                      } else {
+                        responseCode = 500;
+                      }
+                    }
+
+                    server.send(responseCode, "application/json", response);
+                  });
 }
 
 bool USBPDController::isPDBoardConnected() {
@@ -189,25 +233,10 @@ String USBPDController::getAllPDOProfiles() {
   json += "],\"activePDO\":" + String(pdController.getPdoNumber()) + "}";
   return json;
 }
-
-// Web handler implementations
-
-void USBPDController::handleRoot(WebServerClass &server) {
-  // Add headers to prevent browser caching and HSTS issues when switching
-  // between HTTP/HTTPS
-  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-  server.sendHeader("Pragma", "no-cache");
-  server.sendHeader("Expires", "0");
-
-  server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
+String USBPDController::getMainPageHtml() const {
+  return String(FPSTR(USB_PD_CONTROLLER_HTML));
 }
-
-void USBPDController::renderHomePage(String &output) {
-  // Copy the HTML content from PROGMEM to a String
-  output = FPSTR(USB_PD_CONTROLLER_HTML);
-}
-
-void USBPDController::handlePDStatus(WebServerClass &server) {
+String USBPDController::handlePDStatusAPI() {
   // Check if PD board is connected
   bool connected = isPDBoardConnected();
 
@@ -237,40 +266,31 @@ void USBPDController::handlePDStatus(WebServerClass &server) {
                "\"}";
   }
 
-  server.send(200, "application/json", response);
+  return response;
+}
+String USBPDController::handleAvailableVoltagesAPI() {
+  return "[5.0, 9.0, 12.0, 15.0, 20.0]";
 }
 
-void USBPDController::handleAvailableVoltages(WebServerClass &server) {
-  server.send(200, "application/json", "[5.0, 9.0, 12.0, 15.0, 20.0]");
+String USBPDController::handleAvailableCurrentsAPI() {
+  return "[0.5, 1.0, 1.5, 2.0, 2.5, 3.0]";
 }
-
-void USBPDController::handleAvailableCurrents(WebServerClass &server) {
-  server.send(200, "application/json", "[0.5, 1.0, 1.5, 2.0, 2.5, 3.0]");
-}
-
-void USBPDController::handlePDOProfiles(WebServerClass &server) {
+String USBPDController::handlePDOProfilesAPI() {
   if (!isPDBoardConnected()) {
-    server.send(503, "application/json",
-                "{\"success\":false,\"message\":\"PD board not connected\"}");
-    return;
+    return "{\"success\":false,\"message\":\"PD board not connected\"}";
   }
 
-  String response = getAllPDOProfiles();
-  server.send(200, "application/json", response);
+  return getAllPDOProfiles();
 }
-
-void USBPDController::handleSetPDConfig(WebServerClass &server) {
-  String postBody = server.arg("plain");
-  Serial.println("Received config: " + postBody);
+String USBPDController::handleSetPDConfigAPI(const String &jsonBody) {
+  Serial.println("Received config: " + jsonBody);
 
   // Parse JSON
   DynamicJsonDocument doc(256);
-  DeserializationError error = deserializeJson(doc, postBody);
+  DeserializationError error = deserializeJson(doc, jsonBody);
 
   if (error) {
-    server.send(400, "application/json",
-                "{\"success\":false,\"message\":\"Invalid JSON\"}");
-    return;
+    return "{\"success\":false,\"message\":\"Invalid JSON\"}";
   }
 
   float voltage = doc["voltage"];
@@ -278,48 +298,21 @@ void USBPDController::handleSetPDConfig(WebServerClass &server) {
 
   // Validate values
   if (voltage < 5.0 || voltage > 20.0 || current < 0.5 || current > 3.0) {
-    server.send(400, "application/json",
-                "{\"success\":false,\"message\":\"Invalid values\"}");
-    return;
+    return "{\"success\":false,\"message\":\"Invalid values\"}";
   }
 
   // Check if PD board is connected
   if (!isPDBoardConnected()) {
-    server.send(503, "application/json",
-                "{\"success\":false,\"message\":\"PD board not connected\"}");
-    return;
+    return "{\"success\":false,\"message\":\"PD board not connected\"}";
   }
 
   // Apply configuration
   bool success = setPDConfig(voltage, current);
 
   if (success) {
-    String response =
-        "{\"success\":true,\"voltage\":" + String(currentVoltage) +
-        ",\"current\":" + String(currentCurrent) + "}";
-    server.send(200, "application/json", response);
+    return "{\"success\":true,\"voltage\":" + String(currentVoltage) +
+           ",\"current\":" + String(currentCurrent) + "}";
   } else {
-    server.send(
-        500, "application/json",
-        "{\"success\":false,\"message\":\"Failed to set configuration\"}");
+    return "{\"success\":false,\"message\":\"Failed to set configuration\"}";
   }
-}
-void USBPDController::handleSetup(WebServerClass &server) {
-  String response =
-      "Starting WiFi configuration portal. Please connect to the WiFi "
-      "network named \"" +
-      String(wifiManager.getAPName()) +
-      "\" and navigate to http://192.168.4.1/wifi";
-
-  // Send response before starting config portal
-  server.send(200, "text/plain", response);
-
-  // Delay to ensure the response is sent
-  delay(500);
-
-  // Stop the server first to ensure clean transition
-  server.stop();
-
-  // Start the config portal
-  wifiManager.startConfigPortal();
 }
