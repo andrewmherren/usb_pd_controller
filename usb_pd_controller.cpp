@@ -67,12 +67,17 @@ void USBPDController::registerRoutes(WebRouter &router, const char *basePath) {
   String mainPath = String(basePath);
   if (!mainPath.endsWith("/"))
     mainPath += "/";
-
+  
   router.addRoute(mainPath.c_str(), HTTP_GET, [this](WebServerClass &server) {
+    Serial.println("USB PD Controller main page requested");
+    Serial.println("Main page HTML length: " + String(strlen_P(USB_PD_CONTROLLER_HTML)));
+    
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     server.sendHeader("Pragma", "no-cache");
     server.sendHeader("Expires", "0");
     server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
+    
+    Serial.println("USB PD Controller main page sent");
   });
 
   // Register API endpoints with base path
