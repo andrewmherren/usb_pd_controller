@@ -33,7 +33,8 @@ void USBPDController::begin(uint8_t i2cAddress) {
 
 void USBPDController::handle() {
   // Periodically check if PD board connection status has changed
-  if (millis() - lastCheckTime > 5000) { // Check every 5 seconds
+  if (millis() - lastCheckTime >
+      30000) { // Check every 30 seconds to reduce I2C spam
     lastCheckTime = millis();
 
     bool connected = isPDBoardConnected();
