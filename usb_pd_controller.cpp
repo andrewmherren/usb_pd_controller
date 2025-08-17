@@ -57,13 +57,13 @@ void USBPDController::handle() {
 }
 
 std::vector<WebRoute> USBPDController::getHttpRoutes() {
-  std::vector<WebRoute> routes;
-
-  // Main page route
+  std::vector<WebRoute> routes; // Main page route
   routes.push_back({"/", WebModule::WM_GET,
                     [this](const String &requestBody,
                            const std::map<String, String> &params) -> String {
-                      return String(FPSTR(USB_PD_CONTROLLER_HTML));
+                      // Use injectCSSLink to add CSS link to HTML
+                      return IWebModule::injectCSSLink(
+                          String(FPSTR(USB_PD_CONTROLLER_HTML)));
                     },
                     "text/html", "Main USB PD control page"});
 
