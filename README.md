@@ -1,15 +1,17 @@
 # USB-C Power Delivery Controller
 
-A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP8266 or ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. This library allows you to configure voltage and current output for connected USB-C devices over a user-friendly web interface.
+A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP8266 or ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. Implements the `IWebModule` interface for seamless integration with web routing systems.
 
 ## Features
 
+- **Web Module Interface**: Implements `IWebModule` interface for integration with web routing systems
 - **Web Interface**: Intuitive UI for setting and monitoring USB-C PD profiles
 - **Dynamic PDO Configuration**: Configure Power Data Objects (PDOs) for different voltage/current requirements
 - **Profile Management**: View and select from available power profiles
 - **Real-time Monitoring**: Check current voltage, current, and power output
 - **REST API**: Control USB-C PD settings programmatically via API endpoints
 - **I2C Communication**: Works with the SparkFun STUSB4500 breakout board over I2C
+- **Global Instance**: Provides `extern` global instance for easy access across modules
 
 ## Hardware Requirements
 
@@ -57,20 +59,36 @@ Connect the SparkFun STUSB4500 board to your ESP32-S3:
      git submodule add https://github.com/yourusername/usb_pd_controller.git lib/usb_pd_controller
      ```
 
-3. Make sure to add the SparkFun STUSB4500 Arduino Library to your `platformio.ini`:
+3. Make sure to add the required dependencies to your `platformio.ini`:
    ```
    lib_deps = 
      https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
      bblanchon/ArduinoJson@^6.20.0
+     https://github.com/andrewmherren/web_module_interface.git
    ```
 
 ## Usage
 
-### Basic Usage
+### IWebModule Interface
+
+The USB PD Controller implements the `IWebModule` interface and provides these routes:
+
+```cpp
+// Routes provided by getHttpRoutes() / getHttpsRoutes():
+// GET  /              - Main USB PD control page  
+// GET  /pd-status     - Get current PD status (JSON)
+// GET  /available-voltages - Get available voltage options (JSON)
+// GET  /available-currents - Get available current options (JSON)
+// GET  /pdo-profiles  - Get PDO profiles information (JSON)
+// POST /set-pd-config - Set new voltage and current configuration (JSON)
+```
+
+### Basic Usage with Web Router
 
 ```cpp
 #include <Arduino.h>
 #include <Wire.h>
+#include <web_router.h>
 #include <usb_pd_controller.h>
 
 void setup() {
@@ -82,122 +100,75 @@ void setup() {
   // Initialize USB PD controller with default I2C address (0x28)
   usbPDController.begin();
   
-  // If you're using WiFi, set up a web server
-  #if defined(ESP8266)
-    ESP8266WebServer server(80);
-  #else
-    WebServer server(80);  // For ESP32-S3
-  #endif
+  // Register USB PD controller with web router
+  webRouter.registerModule("/usb_pd", &usbPDController);
   
-  // Add USB PD controller web handlers to your server
-  usbPDController.setupWebHandlers(server);
+  // Start the web router
+  webRouter.begin(80, 443);
   
-  // Start the web server
-  server.begin();
-  Serial.println("Web server started. You can now access the USB PD control interface.");
+  Serial.println("Web router started with USB PD controller at /usb_pd/");
 }
 
 void loop() {
-  // Handle USB PD controller operations
-  usbPDController.handle();
-}
-```
-
-### Integration with Web Server
-
-This library can be integrated with any ESP8266WebServer or WebServer (ESP32) instance:
-
-#### ESP8266 Example
-
-```cpp
-#include <Arduino.h>
-#include <Wire.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <usb_pd_controller.h>
-
-// WiFi credentials
-const char* ssid = "YourWiFiNetwork";
-const char* password = "YourWiFiPassword";
-
-// Create web server
-ESP8266WebServer server(80);
-
-void setup() {
-  Serial.begin(115200);
-  
-  // Initialize I2C
-  Wire.begin();
-  
-  // Connect to WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  Serial.print("Connected to WiFi. IP address: ");
-  Serial.println(WiFi.localIP());
-  
-  // Initialize USB PD controller
-  usbPDController.begin();
-  
-  // Add USB PD controller web handlers to the server
-  usbPDController.setupWebHandlers(server);
-  
-  // Start the web server
-  server.begin();
-  Serial.println("Web server started with USB PD control interface");
-}
-
-void loop() {
-  // Handle HTTP requests
-  server.handleClient();
+  // Handle web router
+  webRouter.handle();
   
   // Handle USB PD controller operations
   usbPDController.handle();
 }
 ```
 
-#### ESP32-S3 Example
+### Integration with WiFi Manager
+
+This library can be integrated with WiFi Manager and Web Router:
 
 ```cpp
 #include <Arduino.h>
 #include <Wire.h>
-#include <WiFi.h>
-#include <WebServer.h>
-#include <usb_pd_controller.h>
 #include <wifi_ap.h>
+#include <web_router.h>
+#include <usb_pd_controller.h>
 
 void setup() {
   Serial.begin(115200);
   
   // Initialize I2C - optionally specify pins for ESP32-S3
-  // Default ESP32-S3 I2C pins are GPIO9 (SCL) and GPIO8 (SDA)
-  Wire.begin(8, 9);  
+  Wire.begin(4, 5);  // SDA=4, SCL=5
   
-  // Initialize the WiFi manager and USB PD controller after WiFi connects
-  wifiManager.onSetupComplete([]() {
+  // Initialize WiFi Manager
+  wifiManager.begin("TickerTape", true);
+  
+  // Only proceed with USB PD Controller when WiFi is connected
+  if (wifiManager.getConnectionState() == WIFI_CONNECTED) {
     // Initialize USB PD controller
     usbPDController.begin();
     
-    // Get reference to the web server
-    WebServer &server = wifiManager.getWebServer();
+    // Register USB PD Controller module with web router
+    webRouter.registerModule("/usb_pd", &usbPDController);
     
-    // Setup USB PD controller web handlers
-    usbPDController.setupWebHandlers(server);
-  });
-  
-  // Start WiFi setup with automatic portal if needed
-  wifiManager.begin("USB-PD-Setup", true);
+    // Register WiFi Manager module
+    webRouter.registerModule("/wifi", &wifiManager);
+    
+    // Start web router
+    webRouter.begin(80, 443);
+    
+    Serial.println("USB PD Controller available at " + 
+                   webRouter.getBaseUrl() + "/usb_pd/");
+  } else {
+    Serial.println("Running in WiFi setup mode. Connect to AP: " + 
+                   String(wifiManager.getAPName()));
+  }
 }
 
 void loop() {
-  // Handle WiFi operations
+  // Always handle WiFi Manager
   wifiManager.handle();
   
-  // Handle USB PD controller operations
-  usbPDController.handle();
+  // Only handle web router and USB PD when WiFi is connected
+  if (wifiManager.getConnectionState() == WIFI_CONNECTED) {
+    webRouter.handle();
+    usbPDController.handle();
+  }
 }
 ```
 
@@ -205,13 +176,16 @@ void loop() {
 
 The library provides a responsive web interface for controlling USB-C PD settings:
 
-- **Main Interface**: `http://[device-ip]/` - USB-C PD control interface
-- **API Endpoints**:
-  - `GET /pd-status` - Returns current PD status
-  - `GET /available-voltages` - Returns available voltage options
-  - `GET /available-currents` - Returns available current options
-  - `GET /pdo-profiles` - Returns all PDO profiles
-  - `POST /set-pd-config` - Sets new voltage and current configuration
+- **Main Interface**: 
+  - When registered with web router: `http://[device-ip]/usb_pd/`
+  - Via mDNS: `http://[hostname].local/usb_pd/`
+
+- **API Endpoints** (all relative to base path):
+  - `GET /pd-status` - Returns current PD status (JSON)
+  - `GET /available-voltages` - Returns available voltage options (JSON)
+  - `GET /available-currents` - Returns available current options (JSON)
+  - `GET /pdo-profiles` - Returns all PDO profiles (JSON)
+  - `POST /set-pd-config` - Sets new voltage and current configuration (JSON)
 
 ## Supported Voltage and Current Ranges
 
@@ -242,26 +216,32 @@ The STUSB4500 chip can negotiate with USB-C PD power supplies to request specifi
 
 ## Dependencies
 
+- **web_module_interface** - Abstract interface for web module integration
 - Wire library (for I2C communication)
 - SparkFun STUSB4500 Arduino Library
-- ESP8266WebServer library (for ESP8266 boards)
-- WebServer library (for ESP32-S3 boards)
 - ArduinoJson library (for API responses)
-- WiFi library (for wireless connectivity)
-- DNSServer library (for captive portal in setup mode)
+
+## Architecture
+
+This module follows modern architecture patterns:
+
+- **IWebModule Implementation**: Implements standard interface for web router integration
+- **Global Instance**: Provides global `usbPDController` instance accessible from any module
+- **Module Independence**: Functions as a standalone module with clear dependencies
 
 ## Installation
 
-1. Install the required libraries through the Arduino Library Manager:
-   - ArduinoJson (by Benoit Blanchon)
-   - SparkFun STUSB4500 Arduino Library (by SparkFun)
+1. Install the required libraries through PlatformIO:
+   ```ini
+   lib_deps = 
+     https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
+     bblanchon/ArduinoJson@^6.20.0
+     https://github.com/andrewmherren/web_module_interface.git
+   ```
    
-2. Create a new project with the appropriate board selected:
-   - For ESP8266: Select your ESP8266 board type (NodeMCU, Wemos D1, etc.)
-   - For ESP32-S3: Select "ESP32S3 Dev Module" or your specific ESP32-S3 board
+2. Create a new project with the appropriate board selected
    
-3. Add the USB PD Controller and WiFi AP modules to your project:
-   - Copy the `lib/usb_pd_controller` and `lib/wifi_ap` folders to your project's library folder
+3. Add the USB PD Controller module to your project
    
 4. Use the example code as a starting point for your project
 
