@@ -1,6 +1,9 @@
 #include "usb_pd_controller.h"
 #include "usb_pd_controller_web.h"
 
+// Create global instance of USBPDController
+USBPDController usbPDController;
+
 // USBPDController implementation
 USBPDController::USBPDController()
     : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
