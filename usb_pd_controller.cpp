@@ -128,14 +128,6 @@ bool USBPDController::readPDConfig() {
   currentVoltage = pdController.getVoltage(pdoNumber);
   currentCurrent = pdController.getCurrent(pdoNumber);
 
-  Serial.print("Read from PD board - PDO: ");
-  Serial.print(pdoNumber);
-  Serial.print(", Voltage: ");
-  Serial.print(currentVoltage);
-  Serial.print("V, Current: ");
-  Serial.print(currentCurrent);
-  Serial.println("A");
-
   return true;
 }
 
@@ -268,7 +260,6 @@ String USBPDController::handlePDOProfilesAPI() {
 }
 
 String USBPDController::handleSetPDConfigAPI(const String &jsonBody) {
-  Serial.println("Received config: " + jsonBody);
 
   // Parse JSON
   DynamicJsonDocument doc(256);
