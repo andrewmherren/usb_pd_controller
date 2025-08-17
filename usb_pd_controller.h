@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
-#include <web_router.h>
+#include <web_module_interface.h>
 
 // Handle DEFAULT definition conflicts with SparkFun library
 // The SparkFun STUSB4500 library defines DEFAULT as 0xFF in
@@ -19,7 +19,7 @@
 // Restore the original DEFAULT definition if it existed
 #pragma pop_macro("DEFAULT")
 
-class USBPDController : public WebModule {
+class USBPDController : public IWebModule {
 public:
   USBPDController(); // Initialize the PD controller with optional I2C address
                      // (default 0x28)
@@ -28,9 +28,11 @@ public:
   // Handle periodic operations (should be called in loop)
   void handle();
 
-  // WebModule interface implementation
-  void registerRoutes(WebRouter &router, const char *basePath) override;
-  void handleLoop() override;
+  // IWebModule interface implementation
+  std::vector<WebRoute> getHttpRoutes() override;
+  std::vector<WebRoute> getHttpsRoutes() override;
+  String getModuleName() const override { return "USBPDController"; }
+  String getModuleVersion() const override { return "2.1.0"; }
 
   // Check if PD board is connected
   bool isPDBoardConnected();

@@ -1,9 +1,6 @@
 #include "usb_pd_controller.h"
 #include "usb_pd_controller_web.h"
 
-// Create global instance of USBPDController
-USBPDController usbPDController;
-
 // USBPDController implementation
 USBPDController::USBPDController()
     : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
@@ -26,20 +23,15 @@ void USBPDController::begin(uint8_t i2cAddress) {
     if (pdBoardConnected) {
       Serial.println("STUSB4500 initialized successfully");
       readPDConfig();
-
+    } else {
       Serial.println("Failed to initialize STUSB4500");
     }
   } else {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
 }
-void USBPDController::handle() {
-  // This method is kept for backward compatibility
-  // The actual work is now done in handleLoop()
-  handleLoop();
-}
 
-void USBPDController::handleLoop() {
+void USBPDController::handle() {
   // Periodically check if PD board connection status has changed
   if (millis() - lastCheckTime > 5000) { // Check every 5 seconds
     lastCheckTime = millis();
@@ -59,77 +51,60 @@ void USBPDController::handleLoop() {
     }
   }
 }
-void USBPDController::registerRoutes(WebRouter &router, const char *basePath) {
-  Serial.print("Registering USB PD Controller routes with base path: ");
-  Serial.println(basePath);
 
-  // Register main page route
-  String mainPath = String(basePath);
-  if (!mainPath.endsWith("/"))
-    mainPath += "/";
-  
-  router.addRoute(mainPath.c_str(), HTTP_GET, [this](WebServerClass &server) {
-    Serial.println("USB PD Controller main page requested");
-    Serial.println("Main page HTML length: " + String(strlen_P(USB_PD_CONTROLLER_HTML)));
-    
-    server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    server.sendHeader("Pragma", "no-cache");
-    server.sendHeader("Expires", "0");
-    server.send_P(200, "text/html", USB_PD_CONTROLLER_HTML);
-    
-    Serial.println("USB PD Controller main page sent");
-  });
+std::vector<WebRoute> USBPDController::getHttpRoutes() {
+  std::vector<WebRoute> routes;
 
-  // Register API endpoints with base path
-  String pdStatusPath = String(basePath) + "/pd-status";
-  router.addRoute(pdStatusPath.c_str(), HTTP_GET,
-                  [this](WebServerClass &server) {
-                    String response = this->handlePDStatusAPI();
-                    server.send(200, "application/json", response);
-                  });
+  // Main page route
+  routes.push_back({"/", WebModule::WM_GET,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return String(FPSTR(USB_PD_CONTROLLER_HTML));
+                    },
+                    "text/html", "Main USB PD control page"});
 
-  String voltagesPath = String(basePath) + "/available-voltages";
-  router.addRoute(voltagesPath.c_str(), HTTP_GET,
-                  [this](WebServerClass &server) {
-                    String response = this->handleAvailableVoltagesAPI();
-                    server.send(200, "application/json", response);
-                  });
+  // API endpoints
+  routes.push_back({"/pd-status", WebModule::WM_GET,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return this->handlePDStatusAPI();
+                    },
+                    "application/json", "Get PD status"});
 
-  String currentsPath = String(basePath) + "/available-currents";
-  router.addRoute(currentsPath.c_str(), HTTP_GET,
-                  [this](WebServerClass &server) {
-                    String response = this->handleAvailableCurrentsAPI();
-                    server.send(200, "application/json", response);
-                  });
+  routes.push_back({"/available-voltages", WebModule::WM_GET,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return this->handleAvailableVoltagesAPI();
+                    },
+                    "application/json", "Get available voltages"});
 
-  String profilesPath = String(basePath) + "/pdo-profiles";
-  router.addRoute(profilesPath.c_str(), HTTP_GET,
-                  [this](WebServerClass &server) {
-                    String response = this->handlePDOProfilesAPI();
-                    server.send(200, "application/json", response);
-                  });
+  routes.push_back({"/available-currents", WebModule::WM_GET,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return this->handleAvailableCurrentsAPI();
+                    },
+                    "application/json", "Get available currents"});
 
-  String configPath = String(basePath) + "/set-pd-config";
-  router.addRoute(configPath.c_str(), HTTP_POST,
-                  [this](WebServerClass &server) {
-                    String jsonBody = server.arg("plain");
-                    String response = this->handleSetPDConfigAPI(jsonBody);
+  routes.push_back({"/pdo-profiles", WebModule::WM_GET,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return this->handlePDOProfilesAPI();
+                    },
+                    "application/json", "Get PDO profiles"});
 
-                    // Determine response code based on response content
-                    int responseCode = 200;
-                    if (response.indexOf("\"success\":false") >= 0) {
-                      if (response.indexOf("Invalid JSON") >= 0 ||
-                          response.indexOf("Invalid values") >= 0) {
-                        responseCode = 400;
-                      } else if (response.indexOf("not connected") >= 0) {
-                        responseCode = 503;
-                      } else {
-                        responseCode = 500;
-                      }
-                    }
+  routes.push_back({"/set-pd-config", WebModule::WM_POST,
+                    [this](const String &requestBody,
+                           const std::map<String, String> &params) -> String {
+                      return this->handleSetPDConfigAPI(requestBody);
+                    },
+                    "application/json", "Set PD configuration"});
 
-                    server.send(responseCode, "application/json", response);
-                  });
+  return routes;
+}
+
+std::vector<WebRoute> USBPDController::getHttpsRoutes() {
+  // For now, use same routes for HTTPS as HTTP
+  return getHttpRoutes();
 }
 
 bool USBPDController::isPDBoardConnected() {
@@ -238,9 +213,11 @@ String USBPDController::getAllPDOProfiles() {
   json += "],\"activePDO\":" + String(pdController.getPdoNumber()) + "}";
   return json;
 }
+
 String USBPDController::getMainPageHtml() const {
   return String(FPSTR(USB_PD_CONTROLLER_HTML));
 }
+
 String USBPDController::handlePDStatusAPI() {
   // Check if PD board is connected
   bool connected = isPDBoardConnected();
@@ -273,6 +250,7 @@ String USBPDController::handlePDStatusAPI() {
 
   return response;
 }
+
 String USBPDController::handleAvailableVoltagesAPI() {
   return "[5.0, 9.0, 12.0, 15.0, 20.0]";
 }
@@ -280,6 +258,7 @@ String USBPDController::handleAvailableVoltagesAPI() {
 String USBPDController::handleAvailableCurrentsAPI() {
   return "[0.5, 1.0, 1.5, 2.0, 2.5, 3.0]";
 }
+
 String USBPDController::handlePDOProfilesAPI() {
   if (!isPDBoardConnected()) {
     return "{\"success\":false,\"message\":\"PD board not connected\"}";
@@ -287,6 +266,7 @@ String USBPDController::handlePDOProfilesAPI() {
 
   return getAllPDOProfiles();
 }
+
 String USBPDController::handleSetPDConfigAPI(const String &jsonBody) {
   Serial.println("Received config: " + jsonBody);
 

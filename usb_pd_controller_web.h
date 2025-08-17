@@ -128,7 +128,22 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(
       color: white;
     }
     .btn-primary:hover {
+.btn:hover:not(:disabled) {
       background: rgba(76, 175, 80, 1);
+      transform: translateY(-2px);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
       transform: translateY(-2px);
     }
     .btn-secondary {
@@ -388,6 +403,8 @@ function loadAvailableOptions() {
         option.text = voltage + ' V';
         voltageSelect.appendChild(option);
       });
+      // Update button state after loading options
+      updateApplyButtonState();
     });
     
   // Load available currents
@@ -402,6 +419,8 @@ function loadAvailableOptions() {
         option.text = current + ' A';
         currentSelect.appendChild(option);
       });
+      // Update button state after loading options
+      updateApplyButtonState();
     });
 }
 
@@ -415,13 +434,32 @@ function selectOptionByValue(selectId, value) {
   }
 }
 
+// Function to update apply button state
+function updateApplyButtonState() {
+  const voltage = document.getElementById('voltageSelect').value;
+  const current = document.getElementById('currentSelect').value;
+  const applyBtn = document.getElementById('applyBtn');
+  
+  if (voltage && current) {
+    applyBtn.disabled = false;
+    applyBtn.style.opacity = '1';
+  } else {
+    applyBtn.disabled = true;
+    applyBtn.style.opacity = '0.5';
+  }
+}
+
+// Add event listeners to dropdowns to update button state
+document.getElementById('voltageSelect').addEventListener('change', updateApplyButtonState);
+document.getElementById('currentSelect').addEventListener('change', updateApplyButtonState);
+
 // Apply button click handler
 document.getElementById('applyBtn').addEventListener('click', function() {
   const voltage = document.getElementById('voltageSelect').value;
   const current = document.getElementById('currentSelect').value;
   
+  // This should not happen due to button being disabled, but just in case
   if (!voltage || !current) {
-    alert('Please select both voltage and current');
     return;
   }
   
@@ -475,6 +513,7 @@ document.getElementById('applyBtn').addEventListener('click', function() {
       setTimeout(fetchCurrentConfig, 3000);
     }
     setFormEnabled(true);
+    updateApplyButtonState(); // Re-check button state after re-enabling
   })
   .catch(error => {
     console.error('Error:', error);
@@ -482,6 +521,7 @@ document.getElementById('applyBtn').addEventListener('click', function() {
     document.getElementById('statusMessage').innerText = 'Failed to apply configuration';
     document.getElementById('retryContainer').classList.remove('hidden');
     setFormEnabled(true);
+    updateApplyButtonState(); // Re-check button state after re-enabling
     
     // Refresh the current status after a delay
     setTimeout(fetchCurrentConfig, 3000);
@@ -502,8 +542,15 @@ document.getElementById('retryBtn').addEventListener('click', function() {
 function setFormEnabled(enabled) {
   document.getElementById('voltageSelect').disabled = !enabled;
   document.getElementById('currentSelect').disabled = !enabled;
-  document.getElementById('applyBtn').disabled = !enabled;
   document.getElementById('cancelBtn').disabled = !enabled;
+  
+  // Don't override the apply button's disabled state logic
+  if (enabled) {
+    updateApplyButtonState();
+  } else {
+    document.getElementById('applyBtn').disabled = true;
+    document.getElementById('applyBtn').style.opacity = '0.5';
+  }
 }
 
 // Load PDO profiles
