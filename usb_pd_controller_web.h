@@ -58,11 +58,7 @@ const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       </div>
     </div>
     
-    <div class="nav-links">
-      <a href="/">🏠 Home</a>
-      <a href="/wifi">📡 WiFi Settings</a>
-      <a href="/web_router">🚀 Web Router Status</a>
-    </div>
+    <!-- Navigation menu will be auto-injected here -->
     
     <div class="footer">
       <p>USB-C Power Delivery Controller</p>
