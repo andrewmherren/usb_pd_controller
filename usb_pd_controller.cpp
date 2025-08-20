@@ -1,5 +1,6 @@
 #include "usb_pd_controller.h"
-#include "usb_pd_controller_web.h"
+#include "assets/usb_pd_html.h"
+#include "assets/usb_pd_js.h"
 
 // Create global instance of USBPDController
 USBPDController usbPDController;
@@ -32,6 +33,9 @@ void USBPDController::begin(uint8_t i2cAddress) {
   } else {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
+  
+  // Register static assets
+  IWebModule::addStaticAsset("/assets/usb-pd-controller.js", String(FPSTR(USB_PD_JS)), "application/javascript", true);
 }
 
 void USBPDController::handle() {
@@ -63,12 +67,13 @@ std::vector<WebRoute> USBPDController::getHttpRoutes() {
                            const std::map<String, String> &params) -> String {
                       // Set current path for navigation menu
                       IWebModule::setCurrentPath("/usb_pd/");
-                      
-                      // Use CSS link and navigation menu injection
-                      String htmlContent = String(FPSTR(USB_PD_CONTROLLER_HTML));
-                      htmlContent = IWebModule::injectCSSLink(htmlContent);
-                      htmlContent = IWebModule::injectNavigationMenu(htmlContent);
-                      
+
+                      // Use navigation menu injection
+                      String htmlContent =
+                          String(FPSTR(USB_PD_HTML));
+                      htmlContent =
+                          IWebModule::injectNavigationMenu(htmlContent);
+
                       return htmlContent;
                     },
                     "text/html", "Main USB PD control page"});
@@ -217,7 +222,7 @@ String USBPDController::getAllPDOProfiles() {
 }
 
 String USBPDController::getMainPageHtml() const {
-  return String(FPSTR(USB_PD_CONTROLLER_HTML));
+  return String(FPSTR(USB_PD_HTML));
 }
 
 String USBPDController::handlePDStatusAPI() {

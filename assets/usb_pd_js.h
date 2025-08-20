@@ -1,72 +1,9 @@
-#ifndef USB_PD_CONTROLLER_WEB_H
-#define USB_PD_CONTROLLER_WEB_H
+#ifndef USB_PD_JS_H
+#define USB_PD_JS_H
 
-// Embedded HTML content for USB PD device control interface
-const char USB_PD_CONTROLLER_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>USB-C Power Delivery Control</title>
-  <link rel="stylesheet" href="/assets/style.css" type="text/css">
-</head>
-<body>
-  <div class="container">
-    <h1>⚡ USB-C Power Delivery Control</h1>
-    
-    <div class="status-grid">
-      <div class="status-card">
-        <h3>Current Status</h3>
-        <p>Voltage: <span id="currentVoltage" class="info">Loading...</span>V</p>
-        <p>Current: <span id="currentCurrent" class="info">Loading...</span>A</p>
-        <p>Power: <span id="currentPower" class="info">Loading...</span>W</p>
-        <div id="statusMessage" class="status-message hidden"></div>
-        <div id="retryContainer" class="button-group hidden">
-          <button id="retryBtn" class="btn btn-warning">🔄 Retry Connection</button>
-        </div>
-      </div>
-    </div>
-    
-    <div class="status-card">
-      <h3>PDO Profiles 
-        <button id="refreshPDOBtn" class="btn btn-secondary refresh-button">🔄 Refresh</button>
-      </h3>
-      <div id="pdoProfiles" class="pdo-container">
-        <div>Loading PDO profiles...</div>
-      </div>
-    </div>
-    
-    <div id="configSection" class="status-card config-section">
-      <h3>⚙️ Set New Configuration</h3>
-      <div class="form-group">
-        <label for="voltageSelect">Voltage:</label>
-        <select id="voltageSelect" class="form-control">
-          <option value="">Select voltage...</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label for="currentSelect">Current:</label>
-        <select id="currentSelect" class="form-control">
-          <option value="">Select current...</option>
-        </select>
-      </div>
-      
-      <div class="button-group">
-        <button id="applyBtn" class="btn btn-primary">✅ Apply Configuration</button>
-        <button id="cancelBtn" class="btn btn-secondary">❌ Cancel</button>
-      </div>
-    </div>
-    
-    <!-- Navigation menu will be auto-injected here -->
-    
-    <div class="footer">
-      <p>USB-C Power Delivery Controller</p>
-      <p>Unified web interface via Web Router</p>
-    </div>
-  </div>
+#include <Arduino.h>
 
-  <script>
+const char USB_PD_JS[] PROGMEM = R"rawliteral(
 // Get current configuration on page load
 window.onload = function() {
   // Initialize with the assumption that device is not connected yet
@@ -93,7 +30,7 @@ function fetchCurrentConfig() {
   document.getElementById('statusMessage').classList.remove('hidden');
   document.getElementById('retryContainer').classList.add('hidden');
   
-  fetch('/pd-status')
+  fetch('/usb_pd/pd-status')
     .then(response => response.json())
     .then(data => {
       if (data.success) {
@@ -149,7 +86,7 @@ function fetchCurrentConfig() {
 
 function loadAvailableOptions() {
   // Load available voltages
-  fetch('/available-voltages')
+  fetch('/usb_pd/available-voltages')
     .then(response => response.json())
     .then(voltages => {
       const voltageSelect = document.getElementById('voltageSelect');
@@ -165,7 +102,7 @@ function loadAvailableOptions() {
     });
     
   // Load available currents
-  fetch('/available-currents')
+  fetch('/usb_pd/available-currents')
     .then(response => response.json())
     .then(currents => {
       const currentSelect = document.getElementById('currentSelect');
@@ -226,7 +163,7 @@ document.getElementById('applyBtn').addEventListener('click', function() {
   document.getElementById('statusMessage').innerText = 'Applying settings...';
   document.getElementById('statusMessage').classList.remove('hidden');
   
-  fetch('/set-pd-config', {
+  fetch('/usb_pd/set-pd-config', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -248,6 +185,11 @@ document.getElementById('applyBtn').addEventListener('click', function() {
       document.getElementById('statusMessage').className = 'status-message success';
       document.getElementById('statusMessage').innerText = 'Settings applied successfully';
       
+      // Show success notification
+      if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
+        TickerTape.showNotification('USB PD settings applied successfully', 'success', 3000);
+      }
+      
       // Refresh PDO profiles to show the new active PDO
       setTimeout(loadPDOProfiles, 1000);
       
@@ -260,6 +202,11 @@ document.getElementById('applyBtn').addEventListener('click', function() {
       document.getElementById('statusMessage').className = 'status-message error';
       document.getElementById('statusMessage').innerText = 'Error: ' + data.message;
       document.getElementById('retryContainer').classList.remove('hidden');
+      
+      // Show error notification
+      if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
+        TickerTape.showNotification('Error: ' + data.message, 'error', 3000);
+      }
       
       // If board not connected, hide form
       if (data.message === 'PD board not connected') {
@@ -279,6 +226,11 @@ document.getElementById('applyBtn').addEventListener('click', function() {
     document.getElementById('retryContainer').classList.remove('hidden');
     setFormEnabled(true);
     updateApplyButtonState(); // Re-check button state after re-enabling
+    
+    // Show error notification
+    if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
+      TickerTape.showNotification('Failed to apply configuration', 'error', 3000);
+    }
     
     // Refresh the current status after a delay
     setTimeout(fetchCurrentConfig, 3000);
@@ -312,7 +264,7 @@ function setFormEnabled(enabled) {
 
 // Load PDO profiles
 function loadPDOProfiles() {
-  fetch('/pdo-profiles')
+  fetch('/usb_pd/pdo-profiles')
     .then(response => response.json())
     .then(data => {
       const container = document.getElementById('pdoProfiles');
@@ -355,9 +307,6 @@ function loadPDOProfiles() {
 document.getElementById('refreshPDOBtn').addEventListener('click', function() {
   loadPDOProfiles();
 });
-  </script>
-</body>
-</html>
 )rawliteral";
 
-#endif // USB_PD_CONTROLLER_WEB_H
+#endif // USB_PD_JS_H
