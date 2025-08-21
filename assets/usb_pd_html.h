@@ -10,7 +10,7 @@ const char USB_PD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>USB-C Power Delivery Control</title>
   <link rel="stylesheet" href="/assets/style.css" type="text/css">
-  <link rel="stylesheet" href="/assets/tickertape-theme.css" type="text/css">
+  <!-- Optional app-specific theme CSS is loaded after default styles -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon.ico" sizes="any">
 </head>

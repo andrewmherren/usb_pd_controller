@@ -30,7 +30,7 @@ function fetchCurrentConfig() {
   document.getElementById('statusMessage').classList.remove('hidden');
   document.getElementById('retryContainer').classList.add('hidden');
   
-  fetch('/usb_pd/pd-status')
+  fetch('pd-status')
     .then(response => response.json())
     .then(data => {
       if (data.success) {
@@ -86,7 +86,7 @@ function fetchCurrentConfig() {
 
 function loadAvailableOptions() {
   // Load available voltages
-  fetch('/usb_pd/available-voltages')
+  fetch('available-voltages')
     .then(response => response.json())
     .then(voltages => {
       const voltageSelect = document.getElementById('voltageSelect');
@@ -102,7 +102,7 @@ function loadAvailableOptions() {
     });
     
   // Load available currents
-  fetch('/usb_pd/available-currents')
+  fetch('available-currents')
     .then(response => response.json())
     .then(currents => {
       const currentSelect = document.getElementById('currentSelect');
@@ -163,7 +163,7 @@ document.getElementById('applyBtn').addEventListener('click', function() {
   document.getElementById('statusMessage').innerText = 'Applying settings...';
   document.getElementById('statusMessage').classList.remove('hidden');
   
-  fetch('/usb_pd/set-pd-config', {
+  fetch('set-pd-config', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -264,7 +264,7 @@ function setFormEnabled(enabled) {
 
 // Load PDO profiles
 function loadPDOProfiles() {
-  fetch('/usb_pd/pdo-profiles')
+  fetch('pdo-profiles')
     .then(response => response.json())
     .then(data => {
       const container = document.getElementById('pdoProfiles');

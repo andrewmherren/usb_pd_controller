@@ -33,9 +33,11 @@ void USBPDController::begin(uint8_t i2cAddress) {
   } else {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
-  
+
   // Register static assets
-  IWebModule::addStaticAsset("/assets/usb-pd-controller.js", String(FPSTR(USB_PD_JS)), "application/javascript", true);
+  IWebModule::addStaticAsset("/assets/usb-pd-controller.js",
+                             String(FPSTR(USB_PD_JS)), "application/javascript",
+                             true);
 }
 
 void USBPDController::handle() {
@@ -69,8 +71,7 @@ std::vector<WebRoute> USBPDController::getHttpRoutes() {
                       IWebModule::setCurrentPath("/usb_pd/");
 
                       // Use navigation menu injection
-                      String htmlContent =
-                          String(FPSTR(USB_PD_HTML));
+                      String htmlContent = String(FPSTR(USB_PD_HTML));
                       htmlContent =
                           IWebModule::injectNavigationMenu(htmlContent);
 
