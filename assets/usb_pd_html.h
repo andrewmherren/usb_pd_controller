@@ -69,9 +69,6 @@ const char USB_PD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
       <p>Unified web interface via Web Router</p>
     </div>
   </div>
-
-  <!-- Load TickerTape utilities -->
-  <script src="/assets/tickertape-utils.js"></script>
   <!-- Load USB PD Controller JavaScript -->
   <script src="/assets/usb-pd-controller.js"></script>
 </body>

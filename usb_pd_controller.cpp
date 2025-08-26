@@ -34,10 +34,13 @@ void USBPDController::begin(uint8_t i2cAddress) {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
 
-  // Register static assets
+  // Register static assets - JavaScript file
   IWebModule::addStaticAsset("/assets/usb-pd-controller.js",
                              String(FPSTR(USB_PD_JS)), "application/javascript",
                              true);
+
+  Serial.println("USB PD Controller: Registered static asset "
+                 "/assets/usb-pd-controller.js");
 }
 
 void USBPDController::handle() {
@@ -269,7 +272,8 @@ String USBPDController::handleAvailableCurrentsAPI() {
 
 String USBPDController::handlePDOProfilesAPI() {
   if (!isPDBoardConnected()) {
-    return "{\"success\":false,\"message\":\"PD board not connected\"}";
+    return "{\"success\":false,\"error\":\"PD board not "
+           "connected\",\"pdos\":[]}";
   }
 
   return getAllPDOProfiles();

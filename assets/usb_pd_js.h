@@ -274,6 +274,12 @@ function loadPDOProfiles() {
         return;
       }
       
+      // Check if pdos array exists and is not empty
+      if (!data.pdos || !Array.isArray(data.pdos) || data.pdos.length === 0) {
+        container.innerHTML = '<div>No PDO profiles available. Device may be disconnected.</div>';
+        return;
+      }
+      
       let html = '';
       data.pdos.forEach(pdo => {
         const cardClass = pdo.active ? 'pdo-card active' : (pdo.fixed ? 'pdo-card fixed' : 'pdo-card');
