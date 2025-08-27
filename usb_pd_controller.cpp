@@ -34,13 +34,7 @@ void USBPDController::begin(uint8_t i2cAddress) {
     Serial.println("STUSB4500 not detected on I2C bus");
   }
 
-  // Register static assets - JavaScript file
-  IWebModule::addStaticAsset("/assets/usb-pd-controller.js",
-                             String(FPSTR(USB_PD_JS)), "application/javascript",
-                             true);
-
-  Serial.println("USB PD Controller: Registered static asset "
-                 "/assets/usb-pd-controller.js");
+  Serial.println("USB PD Controller initialized");
 }
 
 void USBPDController::handle() {
@@ -66,57 +60,60 @@ void USBPDController::handle() {
 }
 
 std::vector<WebRoute> USBPDController::getHttpRoutes() {
-  std::vector<WebRoute> routes; // Main page route
-  routes.push_back({"/", WebModule::WM_GET,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      // Set current path for navigation menu
-                      IWebModule::setCurrentPath("/usb_pd/");
+  std::vector<WebRoute> routes;
 
-                      // Use navigation menu injection
-                      String htmlContent = String(FPSTR(USB_PD_HTML));
-                      htmlContent =
-                          IWebModule::injectNavigationMenu(htmlContent);
+  // Main page route with unified handler
+  routes.push_back(
+      {"/", WebModule::WM_GET, [this](WebRequest &req, WebResponse &res) {
+         // Set current path for navigation menu
+         IWebModule::setCurrentPath("/usb_pd/");
 
-                      return htmlContent;
-                    },
-                    "text/html", "Main USB PD control page"});
+         // Use navigation menu injection
+         String htmlContent = String(FPSTR(USB_PD_HTML));
+         htmlContent = IWebModule::injectNavigationMenu(htmlContent);
+
+         res.setContent(htmlContent, "text/html");
+       }});
+
+  // JavaScript file
+  routes.push_back({"/assets/usb-pd-controller.js", WebModule::WM_GET,
+                    [](WebRequest &req, WebResponse &res) {
+                      res.setContent(String(FPSTR(USB_PD_JS)),
+                                     "application/javascript");
+                      res.setHeader("Cache-Control", "public, max-age=3600");
+                    }});
 
   // API endpoints
   routes.push_back({"/pd-status", WebModule::WM_GET,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      return this->handlePDStatusAPI();
-                    },
-                    "application/json", "Get PD status"});
+                    [this](WebRequest &req, WebResponse &res) {
+                      String response = this->handlePDStatusAPI();
+                      res.setContent(response, "application/json");
+                    }});
 
   routes.push_back({"/available-voltages", WebModule::WM_GET,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      return this->handleAvailableVoltagesAPI();
-                    },
-                    "application/json", "Get available voltages"});
+                    [this](WebRequest &req, WebResponse &res) {
+                      String response = this->handleAvailableVoltagesAPI();
+                      res.setContent(response, "application/json");
+                    }});
 
   routes.push_back({"/available-currents", WebModule::WM_GET,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      return this->handleAvailableCurrentsAPI();
-                    },
-                    "application/json", "Get available currents"});
+                    [this](WebRequest &req, WebResponse &res) {
+                      String response = this->handleAvailableCurrentsAPI();
+                      res.setContent(response, "application/json");
+                    }});
 
   routes.push_back({"/pdo-profiles", WebModule::WM_GET,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      return this->handlePDOProfilesAPI();
-                    },
-                    "application/json", "Get PDO profiles"});
+                    [this](WebRequest &req, WebResponse &res) {
+                      String response = this->handlePDOProfilesAPI();
+                      res.setContent(response, "application/json");
+                    }});
 
   routes.push_back({"/set-pd-config", WebModule::WM_POST,
-                    [this](const String &requestBody,
-                           const std::map<String, String> &params) -> String {
-                      return this->handleSetPDConfigAPI(requestBody);
-                    },
-                    "application/json", "Set PD configuration"});
+                    [this](WebRequest &req, WebResponse &res) {
+                      String response =
+                          this->handleSetPDConfigAPI(req.getBody());
+                      res.setContent(response, "application/json");
+                    }});
 
   return routes;
 }

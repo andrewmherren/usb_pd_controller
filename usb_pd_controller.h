@@ -6,6 +6,9 @@
 #include <Wire.h>
 #include <web_module_interface.h>
 
+// Forward declaration of WebPlatform (from web_platform.h)
+extern class WebPlatform webPlatform;
+
 // Handle DEFAULT definition conflicts with SparkFun library
 // The SparkFun STUSB4500 library defines DEFAULT as 0xFF in
 // stusb4500_register_map.h We need to be careful with any DEFAULT definitions
