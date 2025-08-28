@@ -70,7 +70,8 @@ const char USB_PD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     </div>
   </div>
   <!-- Load USB PD Controller JavaScript -->
-  <script src="/assets/usb-pd-controller.js"></script>
+  <!-- Path is relative to module prefix -->
+  <script src="assets/usb-pd-controller.js"></script>
 </body>
 </html>)rawliteral";
 

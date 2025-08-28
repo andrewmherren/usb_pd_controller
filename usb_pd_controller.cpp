@@ -60,11 +60,16 @@ void USBPDController::handle() {
 }
 
 std::vector<WebRoute> USBPDController::getHttpRoutes() {
-  std::vector<WebRoute> routes;
+  Serial.println("USBPDController: Registering HTTP routes");
+  std::vector<WebRoute> routes; // Main page route with unified handler
 
-  // Main page route with unified handler
+  // Root route - this becomes something like /usb_pd/ when registered with
+  // prefix
   routes.push_back(
-      {"/", WebModule::WM_GET, [this](WebRequest &req, WebResponse &res) {
+      {"", WebModule::WM_GET, [this](WebRequest &req, WebResponse &res) {
+         // Debug output
+         Serial.println("USBPDController: Serving main HTML page at /usb_pd/");
+
          // Set current path for navigation menu
          IWebModule::setCurrentPath("/usb_pd/");
 
@@ -75,45 +80,53 @@ std::vector<WebRoute> USBPDController::getHttpRoutes() {
          res.setContent(htmlContent, "text/html");
        }});
 
-  // JavaScript file
-  routes.push_back({"/assets/usb-pd-controller.js", WebModule::WM_GET,
+  // JavaScript file - corrected path
+  routes.push_back({"assets/usb-pd-controller.js", WebModule::WM_GET,
                     [](WebRequest &req, WebResponse &res) {
                       res.setContent(String(FPSTR(USB_PD_JS)),
                                      "application/javascript");
                       res.setHeader("Cache-Control", "public, max-age=3600");
                     }});
 
-  // API endpoints
-  routes.push_back({"/pd-status", WebModule::WM_GET,
+  // API endpoints - removed leading slashes to avoid double-slash issues
+  routes.push_back({"pd-status", WebModule::WM_GET,
                     [this](WebRequest &req, WebResponse &res) {
                       String response = this->handlePDStatusAPI();
                       res.setContent(response, "application/json");
                     }});
 
-  routes.push_back({"/available-voltages", WebModule::WM_GET,
+  routes.push_back({"available-voltages", WebModule::WM_GET,
                     [this](WebRequest &req, WebResponse &res) {
                       String response = this->handleAvailableVoltagesAPI();
                       res.setContent(response, "application/json");
                     }});
 
-  routes.push_back({"/available-currents", WebModule::WM_GET,
+  routes.push_back({"available-currents", WebModule::WM_GET,
                     [this](WebRequest &req, WebResponse &res) {
                       String response = this->handleAvailableCurrentsAPI();
                       res.setContent(response, "application/json");
                     }});
 
-  routes.push_back({"/pdo-profiles", WebModule::WM_GET,
+  routes.push_back({"pdo-profiles", WebModule::WM_GET,
                     [this](WebRequest &req, WebResponse &res) {
                       String response = this->handlePDOProfilesAPI();
                       res.setContent(response, "application/json");
                     }});
 
-  routes.push_back({"/set-pd-config", WebModule::WM_POST,
+  routes.push_back({"set-pd-config", WebModule::WM_POST,
                     [this](WebRequest &req, WebResponse &res) {
                       String response =
                           this->handleSetPDConfigAPI(req.getBody());
                       res.setContent(response, "application/json");
                     }});
+
+  // Debug print route paths
+  Serial.println("USBPDController: Registered routes:");
+  for (const auto &route : routes) {
+    Serial.printf("  %s %s\n",
+                  (route.method == WebModule::WM_GET ? "GET" : "POST"),
+                  route.path.c_str());
+  }
 
   return routes;
 }
