@@ -11,11 +11,14 @@ const char USB_PD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
   <title>USB-C Power Delivery Control</title>
   <link rel="stylesheet" href="/assets/style.css" type="text/css">
   <!-- Optional app-specific theme CSS is loaded after default styles -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <script src="/assets/web-platform-utils.js"></script>
+  <script src="assets/usb-pd-controller.js"></script>
 </head>
 <body>
   <div class="container">
+    {{NAV_MENU}}
     <h1>⚡ USB-C Power Delivery Control</h1>
     
     <div class="status-grid">
@@ -61,17 +64,11 @@ const char USB_PD_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
         <button id="cancelBtn" class="btn btn-secondary">❌ Cancel</button>
       </div>
     </div>
-    
-    <!-- Navigation menu will be auto-injected here -->
-    
     <div class="footer">
       <p>USB-C Power Delivery Controller</p>
       <p>Unified web interface via Web Router</p>
     </div>
   </div>
-  <!-- Load USB PD Controller JavaScript -->
-  <!-- Path is relative to module prefix -->
-  <script src="assets/usb-pd-controller.js"></script>
 </body>
 </html>)rawliteral";
 

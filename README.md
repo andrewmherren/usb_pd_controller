@@ -1,6 +1,6 @@
 # USB-C Power Delivery Controller
 
-A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP8266 or ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. Implements the `IWebModule` interface for seamless integration with web routing systems.
+A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. Implements the `IWebModule` interface for seamless integration with web routing systems.
 
 ## Features
 
@@ -15,23 +15,12 @@ A web-based interface for controlling USB-C Power Delivery (PD) settings through
 
 ## Hardware Requirements
 
-- ESP8266-based board (NodeMCU, Wemos D1, etc.) or ESP32-S3 board
+- ESP32-S3 board
 - [SparkFun USB-C Power Delivery Board (STUSB4500)](https://www.sparkfun.com/products/15801)
 - USB-C PD compliant power supply
 - USB-C device to power
 
 ## Wiring
-
-### ESP8266 Wiring
-
-Connect the SparkFun STUSB4500 board to your ESP8266:
-
-| ESP8266     | STUSB4500 |
-|-------------|-----------|
-| 3.3V        | 3.3V      |
-| GND         | GND       |
-| D1 (GPIO 5) | SCL       |
-| D2 (GPIO 4) | SDA       |
 
 ### ESP32-S3 Wiring
 
@@ -48,15 +37,15 @@ Connect the SparkFun STUSB4500 board to your ESP32-S3:
 
 ## Installation
 
-1. Create a new PlatformIO project for your ESP8266 device.
+1. Create a new PlatformIO project for your ESP32 device.
 2. Add this library to your project:
    - Clone this repository into your project's `lib` folder: 
      ```
-     git clone https://github.com/yourusername/usb_pd_controller.git lib/usb_pd_controller
+     git clone https://github.com/andrewmherren/usb_pd_controller.git lib/usb_pd_controller
      ```
    - Or use git submodules if your project is a git repository:
      ```
-     git submodule add https://github.com/yourusername/usb_pd_controller.git lib/usb_pd_controller
+     git submodule add https://github.com/andrewmherren/usb_pd_controller.git lib/usb_pd_controller
      ```
 
 3. Make sure to add the required dependencies to your `platformio.ini`:
@@ -106,7 +95,7 @@ void setup() {
   // Start the web router
   webRouter.begin(80, 443);
   
-  Serial.println("Web router started with USB PD controller at /usb_pd/");
+  DEBUG_PRINTLN("Web router started with USB PD controller at /usb_pd/");
 }
 
 void loop() {
@@ -152,10 +141,10 @@ void setup() {
     // Start web router
     webRouter.begin(80, 443);
     
-    Serial.println("USB PD Controller available at " + 
+    DEBUG_PRINTLN("USB PD Controller available at " + 
                    webRouter.getBaseUrl() + "/usb_pd/");
   } else {
-    Serial.println("Running in WiFi setup mode. Connect to AP: " + 
+    DEBUG_PRINTLN("Running in WiFi setup mode. Connect to AP: " + 
                    String(wifiManager.getAPName()));
   }
 }
@@ -212,7 +201,7 @@ The STUSB4500 chip can negotiate with USB-C PD power supplies to request specifi
 
 - **Board Not Detected**: Make sure the I2C connections are correct and the STUSB4500 board is properly powered.
 - **Power Not Changing**: Some power supplies may not support all voltage/current combinations. Try different values.
-- **Web Interface Not Loading**: Ensure your WiFi connection is stable and the ESP8266 is properly connected to your network.
+- **Web Interface Not Loading**: Ensure your WiFi connection is stable and the ESP32 is properly connected to your network.
 
 ## Dependencies
 

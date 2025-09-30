@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
-#include <web_module_interface.h>
+#include <web_platform.h>
 
 // Forward declaration of WebPlatform (from web_platform.h)
 extern class WebPlatform webPlatform;
@@ -24,18 +24,20 @@ extern class WebPlatform webPlatform;
 
 class USBPDController : public IWebModule {
 public:
-  USBPDController(); // Initialize the PD controller with optional I2C address
-                     // (default 0x28)
-  void begin(uint8_t i2cAddress = 0x28);
+  USBPDController(); // Initialize the PD controller
 
-  // Handle periodic operations (should be called in loop)
-  void handle();
+  // Module lifecycle methods (IWebModule interface)
+  void begin() override;
+  void handle() override;
 
   // IWebModule interface implementation
-  std::vector<WebRoute> getHttpRoutes() override;
-  std::vector<WebRoute> getHttpsRoutes() override;
-  String getModuleName() const override { return "USBPDController"; }
-  String getModuleVersion() const override { return "2.1.0"; }
+  std::vector<RouteVariant> getHttpRoutes() override;
+  std::vector<RouteVariant> getHttpsRoutes() override;
+  String getModuleName() const override { return "USB PD Controller"; }
+  String getModuleVersion() const override { return "0.1.0"; }
+  String getModuleDescription() const override {
+    return "USB-C Power Delivery voltage and current control";
+  }
 
   // Check if PD board is connected
   bool isPDBoardConnected();
@@ -52,12 +54,13 @@ public:
   // Get the main HTML content for this module
   String getMainPageHtml() const;
 
-  // API handler methods (for use by web router)
-  String handlePDStatusAPI();
-  String handleAvailableVoltagesAPI();
-  String handleAvailableCurrentsAPI();
-  String handlePDOProfilesAPI();
-  String handleSetPDConfigAPI(const String &jsonBody);
+  // Route handler methods
+  void mainPageHandler(WebRequest &req, WebResponse &res);
+  void pdStatusHandler(WebRequest &req, WebResponse &res);
+  void availableVoltagesHandler(WebRequest &req, WebResponse &res);
+  void availableCurrentsHandler(WebRequest &req, WebResponse &res);
+  void pdoProfilesHandler(WebRequest &req, WebResponse &res);
+  void setPDConfigHandler(WebRequest &req, WebResponse &res);
 
 private:
   STUSB4500 pdController;
@@ -68,6 +71,9 @@ private:
   bool pdBoardConnected;
   unsigned long lastCheckTime;
   uint8_t i2cAddress;
+
+  // Initialize hardware with I2C address
+  void initializeHardware(uint8_t i2cAddress = 0x28);
 };
 
 // Global instance

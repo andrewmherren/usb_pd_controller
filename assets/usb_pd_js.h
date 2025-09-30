@@ -4,6 +4,8 @@
 #include <Arduino.h>
 
 const char USB_PD_JS[] PROGMEM = R"rawliteral(
+
+
 // Get current configuration on page load
 window.onload = function() {
   // Initialize with the assumption that device is not connected yet
@@ -20,7 +22,7 @@ window.onload = function() {
   loadPDOProfiles();
 };
 
-function fetchCurrentConfig() {
+async function fetchCurrentConfig() {
   // Show loading state
   document.getElementById('currentVoltage').innerText = 'Loading...';
   document.getElementById('currentCurrent').innerText = 'Loading...';
@@ -30,92 +32,93 @@ function fetchCurrentConfig() {
   document.getElementById('statusMessage').classList.remove('hidden');
   document.getElementById('retryContainer').classList.add('hidden');
   
-  fetch('pd-status')
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        // Success case - PD board connected and values read
-        document.getElementById('currentVoltage').innerText = data.voltage;
-        document.getElementById('currentCurrent').innerText = data.current;
-        document.getElementById('currentPower').innerText = (data.voltage * data.current).toFixed(2);
-        
-        // Pre-select the current values in dropdowns
-        selectOptionByValue('voltageSelect', data.voltage);
-        selectOptionByValue('currentSelect', data.current);
-        
-        // Show success status and enable form
-        document.getElementById('statusMessage').className = 'status-message success';
-        document.getElementById('statusMessage').innerText = 'Device connected and ready';
-        document.getElementById('configSection').classList.remove('hidden');
-        document.getElementById('retryContainer').classList.add('hidden');
-        setFormEnabled(true);
-        
-      } else {
-        // Error case - PD board not connected or values not read
-        document.getElementById('currentVoltage').innerText = 'N/A';
-        document.getElementById('currentCurrent').innerText = 'N/A';
-        document.getElementById('currentPower').innerText = 'N/A';
-        
-        // Show error status and disable form
-        document.getElementById('statusMessage').className = 'status-message error';
-        document.getElementById('statusMessage').innerText = data.message;
-        document.getElementById('retryContainer').classList.remove('hidden');
-        
-        if (data.connected) {
-          // Board is connected but values not read - still show form
-          document.getElementById('configSection').classList.remove('hidden');
-          setFormEnabled(false);
-        } else {
-          // Board not connected - hide form completely
-          document.getElementById('configSection').classList.add('hidden');
-        }
-      }
-    }).catch(error => {
-      console.error('Error fetching status:', error);
-      document.getElementById('currentVoltage').innerText = 'Error';
-      document.getElementById('currentCurrent').innerText = 'Error';
-      document.getElementById('currentPower').innerText = 'Error';
+  try {
+    const data = await AuthUtils.fetchJSON('pd-status');
+    if (data.success) {
+      // Success case - PD board connected and values read
+      document.getElementById('currentVoltage').innerText = data.voltage;
+      document.getElementById('currentCurrent').innerText = data.current;
+      document.getElementById('currentPower').innerText = (data.voltage * data.current).toFixed(2);
       
-      // Display error message and show retry button
+      // Pre-select the current values in dropdowns
+      selectOptionByValue('voltageSelect', data.voltage);
+      selectOptionByValue('currentSelect', data.current);
+      
+      // Show success status and enable form
+      document.getElementById('statusMessage').className = 'status-message success';
+      document.getElementById('statusMessage').innerText = 'Device connected and ready';
+      document.getElementById('configSection').classList.remove('hidden');
+      document.getElementById('retryContainer').classList.add('hidden');
+      setFormEnabled(true);
+      
+    } else {
+      // Error case - PD board not connected or values not read
+      document.getElementById('currentVoltage').innerText = 'N/A';
+      document.getElementById('currentCurrent').innerText = 'N/A';
+      document.getElementById('currentPower').innerText = 'N/A';
+      
+      // Show error status and disable form
       document.getElementById('statusMessage').className = 'status-message error';
-      document.getElementById('statusMessage').innerText = 'Failed to communicate with device';
-      document.getElementById('configSection').classList.add('hidden');
+      document.getElementById('statusMessage').innerText = data.message;
       document.getElementById('retryContainer').classList.remove('hidden');
-    });
+      
+      if (data.connected) {
+        // Board is connected but values not read - still show form
+        document.getElementById('configSection').classList.remove('hidden');
+        setFormEnabled(false);
+      } else {
+        // Board not connected - hide form completely
+        document.getElementById('configSection').classList.add('hidden');
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching status:', error);
+    document.getElementById('currentVoltage').innerText = 'Error';
+    document.getElementById('currentCurrent').innerText = 'Error';
+    document.getElementById('currentPower').innerText = 'Error';
+    
+    // Display error message and show retry button
+    document.getElementById('statusMessage').className = 'status-message error';
+    document.getElementById('statusMessage').innerText = 'Failed to communicate with device: ' + error.message;
+    document.getElementById('configSection').classList.add('hidden');
+    document.getElementById('retryContainer').classList.remove('hidden');
+  }
 }
 
-function loadAvailableOptions() {
-  // Load available voltages
-  fetch('available-voltages')
-    .then(response => response.json())
-    .then(voltages => {
-      const voltageSelect = document.getElementById('voltageSelect');
-      voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
-      voltages.forEach(voltage => {
-        const option = document.createElement('option');
-        option.value = voltage;
-        option.text = voltage + ' V';
-        voltageSelect.appendChild(option);
-      });
-      // Update button state after loading options
-      updateApplyButtonState();
+async function loadAvailableOptions() {
+  try {
+    // Load available voltages
+    const voltages = await AuthUtils.fetchJSON('available-voltages');
+    const voltageSelect = document.getElementById('voltageSelect');
+    voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
+    voltages.forEach(voltage => {
+      const option = document.createElement('option');
+      option.value = voltage;
+      option.text = voltage + ' V';
+      voltageSelect.appendChild(option);
     });
-    
-  // Load available currents
-  fetch('available-currents')
-    .then(response => response.json())
-    .then(currents => {
-      const currentSelect = document.getElementById('currentSelect');
-      currentSelect.innerHTML = '<option value="">Select current...</option>';
-      currents.forEach(current => {
-        const option = document.createElement('option');
-        option.value = current;
-        option.text = current + ' A';
-        currentSelect.appendChild(option);
-      });
-      // Update button state after loading options
-      updateApplyButtonState();
+    // Update button state after loading options
+    updateApplyButtonState();
+  } catch (error) {
+    console.error('Error loading available voltages:', error);
+  }
+  
+  try {
+    // Load available currents
+    const currents = await AuthUtils.fetchJSON('available-currents');
+    const currentSelect = document.getElementById('currentSelect');
+    currentSelect.innerHTML = '<option value="">Select current...</option>';
+    currents.forEach(current => {
+      const option = document.createElement('option');
+      option.value = current;
+      option.text = current + ' A';
+      currentSelect.appendChild(option);
     });
+    // Update button state after loading options
+    updateApplyButtonState();
+  } catch (error) {
+    console.error('Error loading available currents:', error);
+  }
 }
 
 function selectOptionByValue(selectId, value) {
@@ -144,108 +147,114 @@ function updateApplyButtonState() {
 }
 
 // Add event listeners to dropdowns to update button state
-document.getElementById('voltageSelect').addEventListener('change', updateApplyButtonState);
-document.getElementById('currentSelect').addEventListener('change', updateApplyButtonState);
+document.addEventListener('DOMContentLoaded', function() {
+  const voltageSelect = document.getElementById('voltageSelect');
+  const currentSelect = document.getElementById('currentSelect');
+  
+  if (voltageSelect) voltageSelect.addEventListener('change', updateApplyButtonState);
+  if (currentSelect) currentSelect.addEventListener('change', updateApplyButtonState);
+});
 
 // Apply button click handler
-document.getElementById('applyBtn').addEventListener('click', function() {
-  const voltage = document.getElementById('voltageSelect').value;
-  const current = document.getElementById('currentSelect').value;
-  
-  // This should not happen due to button being disabled, but just in case
-  if (!voltage || !current) {
-    return;
+document.addEventListener('DOMContentLoaded', function() {
+  const applyBtn = document.getElementById('applyBtn');
+  if (applyBtn) {
+    applyBtn.addEventListener('click', function() {
+      const voltage = document.getElementById('voltageSelect').value;
+      const current = document.getElementById('currentSelect').value;
+      
+      // This should not happen due to button being disabled, but just in case
+      if (!voltage || !current) {
+        return;
+      }
+      
+      // Disable form while applying
+      setFormEnabled(false);
+      document.getElementById('statusMessage').className = 'status-message info';
+      document.getElementById('statusMessage').innerText = 'Applying settings...';
+      document.getElementById('statusMessage').classList.remove('hidden');
+      
+      try {
+        const data = await AuthUtils.fetchJSON('set-pd-config', {
+          method: 'POST',
+          body: JSON.stringify({
+            voltage: parseFloat(voltage),
+            current: parseFloat(current)
+          })
+        });
+        
+        if (data.success) {
+          // Update displayed values
+          document.getElementById('currentVoltage').innerText = data.voltage;
+          document.getElementById('currentCurrent').innerText = data.current;
+          document.getElementById('currentPower').innerText = (data.voltage * data.current).toFixed(2);
+          
+          // Display success message
+          document.getElementById('statusMessage').className = 'status-message success';
+          document.getElementById('statusMessage').innerText = 'Settings applied successfully';
+          
+          // Show success notification using UIUtils
+          UIUtils.showAlert('Success', 'USB PD settings applied successfully', 'success');
+          
+          // Refresh PDO profiles to show the new active PDO
+          setTimeout(loadPDOProfiles, 1000);
+          
+          // Hide success message after 3 seconds
+          setTimeout(function() {
+            document.getElementById('statusMessage').classList.add('hidden');
+          }, 3000);
+        } else {
+          // Display error message
+          document.getElementById('statusMessage').className = 'status-message error';
+          document.getElementById('statusMessage').innerText = 'Error: ' + data.message;
+          document.getElementById('retryContainer').classList.remove('hidden');
+          
+          // Show error notification using UIUtils
+          UIUtils.showAlert('Error', data.message, 'error');
+          
+          // If board not connected, hide form
+          if (data.message === 'PD board not connected') {
+            document.getElementById('configSection').classList.add('hidden');
+          }
+          
+          // Refresh the current status
+          setTimeout(fetchCurrentConfig, 3000);
+        }
+        setFormEnabled(true);
+        updateApplyButtonState(); // Re-check button state after re-enabling
+      } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('statusMessage').className = 'status-message error';
+        document.getElementById('statusMessage').innerText = 'Failed to apply configuration: ' + error.message;
+        document.getElementById('retryContainer').classList.remove('hidden');
+        setFormEnabled(true);
+        updateApplyButtonState(); // Re-check button state after re-enabling
+        
+        // Show error notification using UIUtils
+        UIUtils.showAlert('Error', 'Failed to apply configuration', 'error');
+        
+        // Refresh the current status after a delay
+        setTimeout(fetchCurrentConfig, 3000);
+      }
+    });
   }
   
-  // Disable form while applying
-  setFormEnabled(false);
-  document.getElementById('statusMessage').className = 'status-message info';
-  document.getElementById('statusMessage').innerText = 'Applying settings...';
-  document.getElementById('statusMessage').classList.remove('hidden');
+  // Cancel button click handler
+  const cancelBtn = document.getElementById('cancelBtn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function() {
+      fetchCurrentConfig(); // Reset dropdowns to current values
+    });
+  }
   
-  fetch('set-pd-config', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      voltage: parseFloat(voltage),
-      current: parseFloat(current)
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      // Update displayed values
-      document.getElementById('currentVoltage').innerText = data.voltage;
-      document.getElementById('currentCurrent').innerText = data.current;
-      document.getElementById('currentPower').innerText = (data.voltage * data.current).toFixed(2);
-      
-      // Display success message
-      document.getElementById('statusMessage').className = 'status-message success';
-      document.getElementById('statusMessage').innerText = 'Settings applied successfully';
-      
-      // Show success notification
-      if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
-        TickerTape.showNotification('USB PD settings applied successfully', 'success', 3000);
-      }
-      
-      // Refresh PDO profiles to show the new active PDO
-      setTimeout(loadPDOProfiles, 1000);
-      
-      // Hide success message after 3 seconds
-      setTimeout(function() {
-        document.getElementById('statusMessage').classList.add('hidden');
-      }, 3000);
-    } else {
-      // Display error message
-      document.getElementById('statusMessage').className = 'status-message error';
-      document.getElementById('statusMessage').innerText = 'Error: ' + data.message;
-      document.getElementById('retryContainer').classList.remove('hidden');
-      
-      // Show error notification
-      if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
-        TickerTape.showNotification('Error: ' + data.message, 'error', 3000);
-      }
-      
-      // If board not connected, hide form
-      if (data.message === 'PD board not connected') {
-        document.getElementById('configSection').classList.add('hidden');
-      }
-      
-      // Refresh the current status
-      setTimeout(fetchCurrentConfig, 3000);
-    }
-    setFormEnabled(true);
-    updateApplyButtonState(); // Re-check button state after re-enabling
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    document.getElementById('statusMessage').className = 'status-message error';
-    document.getElementById('statusMessage').innerText = 'Failed to apply configuration';
-    document.getElementById('retryContainer').classList.remove('hidden');
-    setFormEnabled(true);
-    updateApplyButtonState(); // Re-check button state after re-enabling
-    
-    // Show error notification
-    if (typeof TickerTape !== 'undefined' && TickerTape.showNotification) {
-      TickerTape.showNotification('Failed to apply configuration', 'error', 3000);
-    }
-    
-    // Refresh the current status after a delay
-    setTimeout(fetchCurrentConfig, 3000);
-  });
-});
-
-// Cancel button click handler
-document.getElementById('cancelBtn').addEventListener('click', function() {
-  fetchCurrentConfig(); // Reset dropdowns to current values
-});
-
-// Retry button click handler
-document.getElementById('retryBtn').addEventListener('click', function() {
-  fetchCurrentConfig(); // Try to reconnect and get status
-  loadPDOProfiles();
+  // Retry button click handler
+  const retryBtn = document.getElementById('retryBtn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', function() {
+      fetchCurrentConfig(); // Try to reconnect and get status
+      loadPDOProfiles();
+    });
+  }
 });
 
 function setFormEnabled(enabled) {
@@ -263,56 +272,50 @@ function setFormEnabled(enabled) {
 }
 
 // Load PDO profiles
-function loadPDOProfiles() {
-  fetch('pdo-profiles')
-    .then(response => response.json())
-    .then(data => {
-      const container = document.getElementById('pdoProfiles');
+async function loadPDOProfiles() {
+  try {
+    const data = await AuthUtils.fetchJSON('pdo-profiles');
+    const container = document.getElementById('pdoProfiles');
+    
+    if (data.error) {
+      container.innerHTML = '<div>Error: ' + data.error + '</div>';
+      return;
+    }
+    
+    // Check if pdos array exists and is not empty
+    if (!data.pdos || !Array.isArray(data.pdos) || data.pdos.length === 0) {
+      container.innerHTML = '<div>No PDO profiles available. Device may be disconnected.</div>';
+      return;
+    }
+    
+    let html = '';
+    data.pdos.forEach(pdo => {
+      const cardClass = pdo.active ? 'pdo-card active' : (pdo.fixed ? 'pdo-card fixed' : 'pdo-card');
+      const badgeClass = pdo.active ? 'pdo-badge active' : (pdo.fixed ? 'pdo-badge fixed' : 'pdo-badge');
+      const badgeText = pdo.active ? 'ACTIVE' : (pdo.fixed ? 'FIXED' : 'AVAILABLE');
       
-      if (data.error) {
-        container.innerHTML = '<div>Error: ' + data.error + '</div>';
-        return;
-      }
-      
-      // Check if pdos array exists and is not empty
-      if (!data.pdos || !Array.isArray(data.pdos) || data.pdos.length === 0) {
-        container.innerHTML = '<div>No PDO profiles available. Device may be disconnected.</div>';
-        return;
-      }
-      
-      let html = '';
-      data.pdos.forEach(pdo => {
-        const cardClass = pdo.active ? 'pdo-card active' : (pdo.fixed ? 'pdo-card fixed' : 'pdo-card');
-        const badgeClass = pdo.active ? 'pdo-badge active' : (pdo.fixed ? 'pdo-badge fixed' : 'pdo-badge');
-        const badgeText = pdo.active ? 'ACTIVE' : (pdo.fixed ? 'FIXED' : 'AVAILABLE');
-        
-        html += `
-          <div class="${cardClass}">
-            <div class="pdo-header">
-              PDO${pdo.number}
-              <span class="${badgeClass}">${badgeText}</span>
-            </div>
-            <div class="pdo-details">
-              <div><strong>${pdo.voltage}V</strong> @ <strong>${pdo.current}A</strong></div>
-              <div>Max Power: <strong>${pdo.power.toFixed(1)}W</strong></div>
-              ${pdo.fixed ? '<div><em>Fixed 5V profile</em></div>' : ''}
-            </div>
+      html += `
+        <div class="${cardClass}">
+          <div class="pdo-header">
+            PDO${pdo.number}
+            <span class="${badgeClass}">${badgeText}</span>
           </div>
-        `;
-      });
-      
-      container.innerHTML = html;
-    })
-    .catch(error => {
-      console.error('Error loading PDO profiles:', error);
-      document.getElementById('pdoProfiles').innerHTML = '<div>Failed to load PDO profiles</div>';
+          <div class="pdo-details">
+            <div><strong>${pdo.voltage}V</strong> @ <strong>${pdo.current}A</strong></div>
+            <div>Max Power: <strong>${pdo.power.toFixed(1)}W</strong></div>
+            ${pdo.fixed ? '<div><em>Fixed 5V profile</em></div>' : ''}
+          </div>
+        </div>
+      `;
     });
+    
+    container.innerHTML = html;
+  } catch (error) {
+    console.error('Error loading PDO profiles:', error);
+    document.getElementById('pdoProfiles').innerHTML = 
+      '<div class="error-message">Failed to load PDO profiles: ' + error.message + '</div>';
+  }
 }
-
-// Add event listener for refresh button
-document.getElementById('refreshPDOBtn').addEventListener('click', function() {
-  loadPDOProfiles();
-});
 )rawliteral";
 
 #endif // USB_PD_JS_H

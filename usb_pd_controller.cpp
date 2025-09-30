@@ -1,6 +1,7 @@
 #include "usb_pd_controller.h"
 #include "assets/usb_pd_html.h"
 #include "assets/usb_pd_js.h"
+#include <web_platform.h>
 
 // Create global instance of USBPDController
 USBPDController usbPDController;
@@ -10,13 +11,18 @@ USBPDController::USBPDController()
     : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
       lastCheckTime(0), i2cAddress(0x28) {}
 
-void USBPDController::begin(uint8_t i2cAddress) {
+void USBPDController::begin() {
+  Serial.println("USB PD Controller module initialized");
+  initializeHardware(); // Use default I2C address
+}
+
+void USBPDController::initializeHardware(uint8_t i2cAddress) {
   // Set the I2C address
   this->i2cAddress = i2cAddress;
 
-  Serial.println("Initializing USB PD Controller...");
-  Serial.print("Using I2C address: 0x");
-  Serial.println(i2cAddress, HEX);
+  DEBUG_PRINTLN("Initializing USB PD Controller hardware...");
+  DEBUG_PRINT("Using I2C address: 0x");
+  DEBUG_PRINTLN(String(i2cAddress, HEX));
 
   // Check if PD board is connected
   pdBoardConnected = isPDBoardConnected();
@@ -25,16 +31,16 @@ void USBPDController::begin(uint8_t i2cAddress) {
   if (pdBoardConnected) {
     pdBoardConnected = pdController.begin();
     if (pdBoardConnected) {
-      Serial.println("STUSB4500 initialized successfully");
+      DEBUG_PRINTLN("STUSB4500 initialized successfully");
       readPDConfig();
     } else {
-      Serial.println("Failed to initialize STUSB4500");
+      DEBUG_PRINTLN("Failed to initialize STUSB4500");
     }
   } else {
-    Serial.println("STUSB4500 not detected on I2C bus");
+    DEBUG_PRINTLN("STUSB4500 not detected on I2C bus");
   }
 
-  Serial.println("USB PD Controller initialized");
+  DEBUG_PRINTLN("USB PD Controller hardware initialized");
 }
 
 void USBPDController::handle() {
@@ -46,92 +52,127 @@ void USBPDController::handle() {
     bool connected = isPDBoardConnected();
     if (connected != pdBoardConnected) {
       if (connected) {
-        Serial.println("PD board connected");
+        DEBUG_PRINTLN("PD board connected");
         pdBoardConnected = pdController.begin();
         if (pdBoardConnected) {
           readPDConfig();
         }
       } else {
-        Serial.println("PD board disconnected");
+        DEBUG_PRINTLN("PD board disconnected");
         pdBoardConnected = false;
       }
     }
   }
 }
 
-std::vector<WebRoute> USBPDController::getHttpRoutes() {
-  Serial.println("USBPDController: Registering HTTP routes");
-  std::vector<WebRoute> routes; // Main page route with unified handler
+std::vector<RouteVariant> USBPDController::getHttpRoutes() {
+  return {// Main page route - local access only for security
+          WebRoute("/", WebModule::WM_GET,
+                   [this](WebRequest &req, WebResponse &res) {
+                     mainPageHandler(req, res);
+                   },
+                   {AuthType::LOCAL_ONLY}),
 
-  // Root route - this becomes something like /usb_pd/ when registered with
-  // prefix
-  routes.push_back(
-      {"", WebModule::WM_GET, [this](WebRequest &req, WebResponse &res) {
-         // Debug output
-         Serial.println("USBPDController: Serving main HTML page at /usb_pd/");
+          // JavaScript assets - local access only
+          WebRoute("/assets/usb-pd-controller.js", WebModule::WM_GET,
+                   [](WebRequest &req, WebResponse &res) {
+                     res.setProgmemContent(USB_PD_JS, "application/javascript");
+                     res.setHeader("Cache-Control", "public, max-age=3600");
+                   },
+                   {AuthType::LOCAL_ONLY}),
 
-         // Set current path for navigation menu
-         IWebModule::setCurrentPath("/usb_pd/");
+          // API endpoints - authentication required for control, local access
+          // for monitoring
+          ApiRoute(
+              "/api/status", WebModule::WM_GET,
+              [this](WebRequest &req, WebResponse &res) {
+                pdStatusHandler(req, res);
+              },
+              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              API_DOC("Get Power Delivery status",
+                      "Returns current PD board connection status and "
+                      "voltage/current readings",
+                      "getPDStatus", {"maker", "power"})),
 
-         // Use navigation menu injection
-         String htmlContent = String(FPSTR(USB_PD_HTML));
-         htmlContent = IWebModule::injectNavigationMenu(htmlContent);
+          ApiRoute(
+              "/api/voltages", WebModule::WM_GET,
+              [this](WebRequest &req, WebResponse &res) {
+                availableVoltagesHandler(req, res);
+              },
+              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              API_DOC("Get available voltages",
+                      "Returns list of supported voltage levels",
+                      "getAvailableVoltages", {"maker", "power"})),
 
-         res.setContent(htmlContent, "text/html");
-       }});
+          ApiRoute(
+              "/api/currents", WebModule::WM_GET,
+              [this](WebRequest &req, WebResponse &res) {
+                availableCurrentsHandler(req, res);
+              },
+              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              API_DOC("Get available currents",
+                      "Returns list of supported current levels",
+                      "getAvailableCurrents", {"maker", "power"})),
 
-  // JavaScript file - corrected path
-  routes.push_back({"assets/usb-pd-controller.js", WebModule::WM_GET,
-                    [](WebRequest &req, WebResponse &res) {
-                      res.setContent(String(FPSTR(USB_PD_JS)),
-                                     "application/javascript");
-                      res.setHeader("Cache-Control", "public, max-age=3600");
-                    }});
+          ApiRoute(
+              "/api/profiles", WebModule::WM_GET,
+              [this](WebRequest &req, WebResponse &res) {
+                pdoProfilesHandler(req, res);
+              },
+              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              API_DOC("Get PDO profiles",
+                      "Returns Power Delivery Object profiles with voltage, "
+                      "current and power specifications",
+                      "getPDOProfiles", {"maker", "power"})),
 
-  // API endpoints - removed leading slashes to avoid double-slash issues
-  routes.push_back({"pd-status", WebModule::WM_GET,
-                    [this](WebRequest &req, WebResponse &res) {
-                      String response = this->handlePDStatusAPI();
-                      res.setContent(response, "application/json");
-                    }});
-
-  routes.push_back({"available-voltages", WebModule::WM_GET,
-                    [this](WebRequest &req, WebResponse &res) {
-                      String response = this->handleAvailableVoltagesAPI();
-                      res.setContent(response, "application/json");
-                    }});
-
-  routes.push_back({"available-currents", WebModule::WM_GET,
-                    [this](WebRequest &req, WebResponse &res) {
-                      String response = this->handleAvailableCurrentsAPI();
-                      res.setContent(response, "application/json");
-                    }});
-
-  routes.push_back({"pdo-profiles", WebModule::WM_GET,
-                    [this](WebRequest &req, WebResponse &res) {
-                      String response = this->handlePDOProfilesAPI();
-                      res.setContent(response, "application/json");
-                    }});
-
-  routes.push_back({"set-pd-config", WebModule::WM_POST,
-                    [this](WebRequest &req, WebResponse &res) {
-                      String response =
-                          this->handleSetPDConfigAPI(req.getBody());
-                      res.setContent(response, "application/json");
-                    }});
-
-  // Debug print route paths
-  Serial.println("USBPDController: Registered routes:");
-  for (const auto &route : routes) {
-    Serial.printf("  %s %s\n",
-                  (route.method == WebModule::WM_GET ? "GET" : "POST"),
-                  route.path.c_str());
-  }
-
-  return routes;
+          ApiRoute(
+              "/api/configure", WebModule::WM_POST,
+              [this](WebRequest &req, WebResponse &res) {
+                setPDConfigHandler(req, res);
+              },
+              {AuthType::SESSION,
+               AuthType::PAGE_TOKEN}, // Require authentication for control
+              API_DOC("Set Power Delivery configuration",
+                      "Updates the USB-C PD voltage and current settings",
+                      "setPDConfig", {"maker", "power"})
+                  .withRequestBody(R"({
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "PD configuration request",
+                "required": ["voltage", "current"],
+                "properties": {
+                  "voltage": {
+                    "type": "number",
+                    "minimum": 5.0,
+                    "maximum": 20.0,
+                    "description": "Target voltage in volts"
+                  },
+                  "current": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 3.0,
+                    "description": "Target current in amperes"
+                  }
+                }
+              }
+            }
+          }
+        })")
+                  .withRequestExample(R"({
+          "voltage": 12.0,
+          "current": 2.0
+        })")
+                  .withResponseExample(R"({
+          "success": true,
+          "voltage": 12.0,
+          "current": 2.0
+        })"))};
 }
 
-std::vector<WebRoute> USBPDController::getHttpsRoutes() {
+std::vector<RouteVariant> USBPDController::getHttpsRoutes() {
   // For now, use same routes for HTTPS as HTTP
   return getHttpRoutes();
 }
@@ -162,7 +203,7 @@ bool USBPDController::readPDConfig() {
 
 bool USBPDController::setPDConfig(float voltage, float current) {
   if (!pdBoardConnected) {
-    Serial.println("Cannot set PD config: board not connected");
+    DEBUG_PRINTLN("Cannot set PD config: board not connected");
     return false;
   }
 
@@ -196,10 +237,10 @@ bool USBPDController::setPDConfig(float voltage, float current) {
 
   // Read back the actual values from the board to confirm
   if (readPDConfig()) {
-    Serial.println("PD configuration updated successfully");
+    DEBUG_PRINTLN("PD configuration updated successfully");
     return true;
   } else {
-    Serial.println("Failed to read back PD configuration");
+    DEBUG_PRINTLN("Failed to read back PD configuration");
     return false;
   }
 }
@@ -239,64 +280,113 @@ String USBPDController::getMainPageHtml() const {
   return String(FPSTR(USB_PD_HTML));
 }
 
-String USBPDController::handlePDStatusAPI() {
-  // Check if PD board is connected
-  bool connected = isPDBoardConnected();
+// Route handler implementations
+void USBPDController::mainPageHandler(WebRequest &req, WebResponse &res) {
+  // Use PROGMEM content for memory efficiency
+  res.setProgmemContent(USB_PD_HTML, "text/html");
+}
 
-  // Try to read fresh values if connected
-  if (connected && !pdBoardConnected) {
-    pdBoardConnected = pdController.begin();
-    if (pdBoardConnected) {
+void USBPDController::pdStatusHandler(WebRequest &req, WebResponse &res) {
+  JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+    // Check if PD board is connected
+    bool connected = isPDBoardConnected();
+
+    // Try to read fresh values if connected
+    if (connected && !pdBoardConnected) {
+      pdBoardConnected = pdController.begin();
+      if (pdBoardConnected) {
+        readPDConfig();
+      }
+    } else if (connected && pdBoardConnected) {
+      // Refresh values if already connected
       readPDConfig();
+    } else {
+      pdBoardConnected = false;
     }
-  } else if (connected && pdBoardConnected) {
-    // Refresh values if already connected
-    readPDConfig();
-  } else {
-    pdBoardConnected = false;
-  }
 
-  String response;
-  if (pdBoardConnected && currentVoltage > 0) {
-    response = "{\"success\":true,\"connected\":true,\"voltage\":" +
-               String(currentVoltage) +
-               ",\"current\":" + String(currentCurrent) + "}";
-  } else {
-    response = "{\"success\":false,\"connected\":" +
-               String(connected ? "true" : "false") + ",\"message\":\"" +
-               (connected ? "Board initialized but values not read"
-                          : "PD board not connected") +
-               "\"}";
-  }
-
-  return response;
+    json["success"] = pdBoardConnected && currentVoltage > 0;
+    json["connected"] = connected;
+    if (pdBoardConnected && currentVoltage > 0) {
+      json["voltage"] = currentVoltage;
+      json["current"] = currentCurrent;
+    } else {
+      json["message"] = connected ? "Board initialized but values not read"
+                                  : "PD board not connected";
+    }
+  });
 }
 
-String USBPDController::handleAvailableVoltagesAPI() {
-  return "[5.0, 9.0, 12.0, 15.0, 20.0]";
+void USBPDController::availableVoltagesHandler(WebRequest &req,
+                                               WebResponse &res) {
+  JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+    JsonArray voltages = json.createNestedArray("voltages");
+    voltages.add(5.0);
+    voltages.add(9.0);
+    voltages.add(12.0);
+    voltages.add(15.0);
+    voltages.add(20.0);
+  });
 }
 
-String USBPDController::handleAvailableCurrentsAPI() {
-  return "[0.5, 1.0, 1.5, 2.0, 2.5, 3.0]";
+void USBPDController::availableCurrentsHandler(WebRequest &req,
+                                               WebResponse &res) {
+  JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+    JsonArray currents = json.createNestedArray("currents");
+    currents.add(0.5);
+    currents.add(1.0);
+    currents.add(1.5);
+    currents.add(2.0);
+    currents.add(2.5);
+    currents.add(3.0);
+  });
 }
 
-String USBPDController::handlePDOProfilesAPI() {
+void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
   if (!isPDBoardConnected()) {
-    return "{\"success\":false,\"error\":\"PD board not "
-           "connected\",\"pdos\":[]}";
+    res.setStatus(503); // Service unavailable
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = false;
+      json["error"] = "PD board not connected";
+      json.createNestedArray("pdos"); // Empty array
+    });
+    return;
   }
 
-  return getAllPDOProfiles();
+  JsonResponseBuilder::createResponse<512>(res, [&](JsonObject &json) {
+    JsonArray pdos = json.createNestedArray("pdos");
+
+    for (int i = 1; i <= 3; i++) {
+      JsonObject pdo = pdos.createNestedObject();
+      float voltage = pdController.getVoltage(i);
+      float current = pdController.getCurrent(i);
+      bool isActive = (pdController.getPdoNumber() == i);
+
+      pdo["number"] = i;
+      pdo["voltage"] = voltage;
+      pdo["current"] = current;
+      pdo["power"] = voltage * current;
+      pdo["active"] = isActive;
+      if (i == 1) {
+        pdo["fixed"] = true; // PDO1 is always fixed at 5V
+      }
+    }
+
+    json["activePDO"] = pdController.getPdoNumber();
+  });
 }
 
-String USBPDController::handleSetPDConfigAPI(const String &jsonBody) {
-
-  // Parse JSON
+void USBPDController::setPDConfigHandler(WebRequest &req, WebResponse &res) {
+  // Parse JSON from request body
   DynamicJsonDocument doc(256);
-  DeserializationError error = deserializeJson(doc, jsonBody);
+  DeserializationError error = deserializeJson(doc, req.getBody());
 
   if (error) {
-    return "{\"success\":false,\"message\":\"Invalid JSON\"}";
+    res.setStatus(400);
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = false;
+      json["error"] = "Invalid JSON";
+    });
+    return;
   }
 
   float voltage = doc["voltage"];
@@ -304,21 +394,39 @@ String USBPDController::handleSetPDConfigAPI(const String &jsonBody) {
 
   // Validate values
   if (voltage < 5.0 || voltage > 20.0 || current < 0.5 || current > 3.0) {
-    return "{\"success\":false,\"message\":\"Invalid values\"}";
+    res.setStatus(400);
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = false;
+      json["error"] = "Invalid values - voltage must be 5.0-20.0V, current "
+                      "must be 0.5-3.0A";
+    });
+    return;
   }
 
   // Check if PD board is connected
   if (!isPDBoardConnected()) {
-    return "{\"success\":false,\"message\":\"PD board not connected\"}";
+    res.setStatus(503);
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = false;
+      json["error"] = "PD board not connected";
+    });
+    return;
   }
 
   // Apply configuration
   bool success = setPDConfig(voltage, current);
 
   if (success) {
-    return "{\"success\":true,\"voltage\":" + String(currentVoltage) +
-           ",\"current\":" + String(currentCurrent) + "}";
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = true;
+      json["voltage"] = currentVoltage;
+      json["current"] = currentCurrent;
+    });
   } else {
-    return "{\"success\":false,\"message\":\"Failed to set configuration\"}";
+    res.setStatus(500);
+    JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
+      json["success"] = false;
+      json["error"] = "Failed to set configuration";
+    });
   }
 }
