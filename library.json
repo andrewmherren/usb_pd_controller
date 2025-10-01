@@ -1,0 +1,26 @@
+{
+    "name": "usb_pd_controller",
+    "version": "0.1.0",
+    "description": "USB-C Power Delivery control module for ESP32 with WebPlatform",
+    "keywords": "usb-c, power-delivery, pd, stusb4500, voltage, current, control",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/andrewmherren/usb_pd_controller.git"
+    },
+    "authors": [
+        {
+            "name": "Andrew Herren",
+            "url": "https://github.com/andrewmherren"
+        }
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/andrewmherren/usb_pd_controller",
+    "dependencies": {
+        "bblanchon/ArduinoJson": "^6.20.0",
+        "SparkFun_STUSB4500_Arduino_Library": "https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git"
+    },
+    "frameworks": "arduino",
+    "platforms": [
+        "espressif32"
+    ]
+}

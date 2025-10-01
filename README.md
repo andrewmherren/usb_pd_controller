@@ -1,263 +1,441 @@
-# USB-C Power Delivery Controller
+# [Web Platform](https://www.github.com/andrewmherren/web_platform) - USB-C Power Delivery Controller
 
-A web-based interface for controlling USB-C Power Delivery (PD) settings through an ESP32-S3 microcontroller and the SparkFun STUSB4500 breakout board. Implements the `IWebModule` interface for seamless integration with web routing systems.
+A comprehensive web module that provides USB-C Power Delivery control with real-time monitoring and configuration through a responsive web interface. Built specifically for the WebPlatform ecosystem on ESP32 devices.
 
-## Features
+## ✨ Features
 
-- **Web Module Interface**: Implements `IWebModule` interface for integration with web routing systems
-- **Web Interface**: Intuitive UI for setting and monitoring USB-C PD profiles
-- **Dynamic PDO Configuration**: Configure Power Data Objects (PDOs) for different voltage/current requirements
-- **Profile Management**: View and select from available power profiles
-- **Real-time Monitoring**: Check current voltage, current, and power output
-- **REST API**: Control USB-C PD settings programmatically via API endpoints
-- **I2C Communication**: Works with the SparkFun STUSB4500 breakout board over I2C
-- **Global Instance**: Provides `extern` global instance for easy access across modules
+- 🔧 **Flexible I2C Configuration**: Configurable SDA/SCL pins and I2C address through JSON config
+- 📱 **Responsive Web Interface**: Complete USB-C PD control dashboard with real-time updates
+- 🔌 **Multi-Board Support**: Extensible architecture supporting different PD controller boards
+- ⚡ **Real-Time Monitoring**: Live voltage, current, and power readings with connection status
+- 📊 **PDO Profile Management**: View and configure Power Delivery Object profiles
+- 🛡️ **Security-First Design**: Authentication-protected routes with session and token support
+- 🚀 **RESTful API**: Complete API for programmatic control with OpenAPI 3.0 documentation
+- 📋 **Maker-Friendly**: Tagged endpoints for inclusion in Maker API specifications
 
-## Hardware Requirements
+## Quick Start
 
-- ESP32-S3 board
-- [SparkFun USB-C Power Delivery Board (STUSB4500)](https://www.sparkfun.com/products/15801)
-- USB-C PD compliant power supply
-- USB-C device to power
+### Hardware Requirements
 
-## Wiring
+- **ESP32 development board** (tested on ESP32-S3)
+- **[SparkFun USB-C Power Delivery Board (STUSB4500)](https://www.sparkfun.com/products/15801)**
+- **USB-C PD compliant power supply**
+- **Jumper wires** for I2C connection
 
-### ESP32-S3 Wiring
+### Default Wiring (ESP32-S3)
 
-Connect the SparkFun STUSB4500 board to your ESP32-S3:
+| ESP32-S3 | STUSB4500 | Notes |
+|----------|-----------|--------|
+| 3.3V     | 3.3V      | Power |
+| GND      | GND       | Ground |
+| GPIO 4   | SDA       | I2C Data (configurable) |
+| GPIO 5   | SCL       | I2C Clock (configurable) |
 
-| ESP32-S3 | STUSB4500 |
-|----------|-----------|
-| 3.3V     | 3.3V      |
-| GND      | GND       |
-| GPIO 5   | SCL       |
-| GPIO 4   | SDA       |
+### Build Configuration
 
-**Note:** The default I2C pins on ESP32-S3 are GPIO 9 (SCL) and GPIO 8 (SDA), but you can use any pins by calling `Wire.begin(SDA_PIN, SCL_PIN)` before initializing the USB PD controller.
+Add the required dependencies to your `platformio.ini`:
 
-## Installation
+```ini
+[env:esp32-s3-devkitc-1]
+platform = espressif32
+board = esp32-s3-devkitc-1
+framework = arduino
+lib_deps = 
+  https://github.com/andrewmherren/web_platform.git
+  https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
+  bblanchon/ArduinoJson@^6.20.0
 
-1. Create a new PlatformIO project for your ESP32 device.
-2. Add this library to your project:
-   - Clone this repository into your project's `lib` folder: 
-     ```
-     git clone https://github.com/andrewmherren/usb_pd_controller.git lib/usb_pd_controller
-     ```
-   - Or use git submodules if your project is a git repository:
-     ```
-     git submodule add https://github.com/andrewmherren/usb_pd_controller.git lib/usb_pd_controller
-     ```
-
-3. Make sure to add the required dependencies to your `platformio.ini`:
-   ```
-   lib_deps = 
-     https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
-     bblanchon/ArduinoJson@^6.20.0
-     https://github.com/andrewmherren/web_module_interface.git
-   ```
-
-## Usage
-
-### IWebModule Interface
-
-The USB PD Controller implements the `IWebModule` interface and provides these routes:
-
-```cpp
-// Routes provided by getHttpRoutes() / getHttpsRoutes():
-// GET  /              - Main USB PD control page  
-// GET  /pd-status     - Get current PD status (JSON)
-// GET  /available-voltages - Get available voltage options (JSON)
-// GET  /available-currents - Get available current options (JSON)
-// GET  /pdo-profiles  - Get PDO profiles information (JSON)
-// POST /set-pd-config - Set new voltage and current configuration (JSON)
+# Optional: Enable OpenAPI documentation for USB PD API endpoints
+build_flags = -DWEB_PLATFORM_OPENAPI=1
 ```
 
-### Basic Usage with Web Router
+### Installation
 
 ```cpp
-#include <Arduino.h>
-#include <Wire.h>
-#include <web_router.h>
+#include <web_platform.h>
 #include <usb_pd_controller.h>
 
 void setup() {
   Serial.begin(115200);
   
-  // Initialize I2C
-  Wire.begin();
+  // Set up navigation with USB PD control link
+  std::vector<NavigationItem> navItems = {
+    NavigationItem("Home", "/"),
+    NavigationItem("USB PD Control", "/usb_pd/"),
+    Authenticated(NavigationItem("Account", "/account")),
+    Authenticated(NavigationItem("Logout", "/logout"))
+  };
+  webPlatform.setNavigationMenu(navItems);
   
-  // Initialize USB PD controller with default I2C address (0x28)
-  usbPDController.begin();
+  // Configure USB PD Controller with I2C settings
+  StaticJsonDocument<128> usbPdConfig;
+  usbPdConfig["SDA"] = 4;           // GPIO 4 for I2C data
+  usbPdConfig["SCL"] = 5;           // GPIO 5 for I2C clock  
+  usbPdConfig["board"] = "sparkfun"; // Board type
+  usbPdConfig["i2cAddress"] = 0x28;  // Optional: custom I2C address
   
-  // Register USB PD controller with web router
-  webRouter.registerModule("/usb_pd", &usbPDController);
+  // Register the module with configuration
+  webPlatform.registerModule("/usb_pd", &usbPDController, usbPdConfig.as<JsonVariant>());
   
-  // Start the web router
-  webRouter.begin(80, 443);
-  
-  DEBUG_PRINTLN("Web router started with USB PD controller at /usb_pd/");
+  // Initialize WebPlatform
+  webPlatform.begin("MyDevice");
 }
 
 void loop() {
-  // Handle web router
-  webRouter.handle();
-  
-  // Handle USB PD controller operations
-  usbPDController.handle();
+  webPlatform.handle();
+  delay(10); // Allow ESP32 system tasks to run
 }
 ```
 
-### Integration with WiFi Manager
+### Access the Interface
 
-This library can be integrated with WiFi Manager and Web Router:
+1. Connect to your device's web interface
+2. Navigate to `/usb_pd/` or use the navigation menu
+3. Log in with your WebPlatform credentials (required for control operations)
+4. Configure USB-C PD voltage and current settings
+
+## Configuration Options
+
+### I2C Pin Configuration
+
+The module supports flexible I2C pin assignment through JSON configuration:
 
 ```cpp
-#include <Arduino.h>
-#include <Wire.h>
-#include <wifi_ap.h>
-#include <web_router.h>
-#include <usb_pd_controller.h>
+// Default configuration (ESP32-S3 compatible)
+StaticJsonDocument<128> config;
+config["SDA"] = 4;
+config["SCL"] = 5;
+webPlatform.registerModule("/usb_pd", &usbPDController, config.as<JsonVariant>());
 
-void setup() {
-  Serial.begin(115200);
-  
-  // Initialize I2C - optionally specify pins for ESP32-S3
-  Wire.begin(4, 5);  // SDA=4, SCL=5
-  
-  // Initialize WiFi Manager
-  wifiManager.begin("TickerTape", true);
-  
-  // Only proceed with USB PD Controller when WiFi is connected
-  if (wifiManager.getConnectionState() == WIFI_CONNECTED) {
-    // Initialize USB PD controller
-    usbPDController.begin();
-    
-    // Register USB PD Controller module with web router
-    webRouter.registerModule("/usb_pd", &usbPDController);
-    
-    // Register WiFi Manager module
-    webRouter.registerModule("/wifi", &wifiManager);
-    
-    // Start web router
-    webRouter.begin(80, 443);
-    
-    DEBUG_PRINTLN("USB PD Controller available at " + 
-                   webRouter.getBaseUrl() + "/usb_pd/");
-  } else {
-    DEBUG_PRINTLN("Running in WiFi setup mode. Connect to AP: " + 
-                   String(wifiManager.getAPName()));
-  }
-}
+// Alternative pins for different ESP32 boards
+StaticJsonDocument<128> altConfig;
+altConfig["SDA"] = 21;  // Different GPIO for SDA
+altConfig["SCL"] = 22;  // Different GPIO for SCL
+webPlatform.registerModule("/usb_pd", &usbPDController, altConfig.as<JsonVariant>());
 
-void loop() {
-  // Always handle WiFi Manager
-  wifiManager.handle();
-  
-  // Only handle web router and USB PD when WiFi is connected
-  if (wifiManager.getConnectionState() == WIFI_CONNECTED) {
-    webRouter.handle();
-    usbPDController.handle();
-  }
-}
+// No configuration (uses defaults: SDA=4, SCL=5, board="sparkfun", i2cAddress=0x28)
+webPlatform.registerModule("/usb_pd", &usbPDController);
 ```
 
-## Web Interface
+### Configuration Parameters
 
-The library provides a responsive web interface for controlling USB-C PD settings:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `SDA` | int | 4 | GPIO pin for I2C data line |
+| `SCL` | int | 5 | GPIO pin for I2C clock line |
+| `board` | string | "sparkfun" | Board type identifier |
+| `i2cAddress` | int | 0x28 | I2C address of the PD controller |
 
-- **Main Interface**: 
-  - When registered with web router: `http://[device-ip]/usb_pd/`
-  - Via mDNS: `http://[hostname].local/usb_pd/`
+### Future Board Support
 
-- **API Endpoints** (all relative to base path):
-  - `GET /pd-status` - Returns current PD status (JSON)
-  - `GET /available-voltages` - Returns available voltage options (JSON)
-  - `GET /available-currents` - Returns available current options (JSON)
-  - `GET /pdo-profiles` - Returns all PDO profiles (JSON)
-  - `POST /set-pd-config` - Sets new voltage and current configuration (JSON)
+The architecture supports multiple board types for future expansion:
 
-## Supported Voltage and Current Ranges
+```cpp
+// Current supported board
+config["board"] = "sparkfun";  // SparkFun STUSB4500
 
-- **Voltages**: 5V, 9V, 12V, 15V, 20V (standard USB-C PD voltages)
-- **Currents**: 0.5A to 3.0A (depending on power supply capabilities)
+// Future board support (when available)
+// config["board"] = "custom";
+```
 
-## How It Works
+## Power Delivery Capabilities
 
-The STUSB4500 chip can negotiate with USB-C PD power supplies to request specific voltage and current levels. This library provides an interface to configure:
+### Supported Voltage Levels
+- **5V** (USB standard, always available)
+- **9V** (Quick Charge compatible)
+- **12V** (Laptop charging)
+- **15V** (High-power devices)
+- **20V** (Maximum USB-C PD specification)
 
-1. **PDO Profiles**: The STUSB4500 supports three Power Data Object (PDO) profiles:
-   - PDO1: Fixed at 5V (default profile)
-   - PDO2: Configurable up to 12V
-   - PDO3: Configurable up to 20V
+### Supported Current Levels
+- **0.5A** (Low power devices)
+- **1.0A** (Phone charging)
+- **1.5A** (Tablet charging)
+- **2.0A** (Fast charging)
+- **2.5A** (High-power charging)
+- **3.0A** (Maximum for most PD supplies)
 
-2. When you set a new configuration through the web interface or API, the library:
-   - Selects the appropriate PDO based on the requested voltage
-   - Updates the voltage and current values for that PDO
-   - Makes that PDO the highest priority
-   - Writes the settings to the STUSB4500 chip
-   - Triggers a soft reset to apply the changes immediately
+### Power Delivery Object (PDO) Management
+
+The STUSB4500 supports three configurable PDO profiles:
+
+1. **PDO 1**: Fixed at 5V (USB standard, non-configurable)
+2. **PDO 2**: Configurable voltage up to 12V
+3. **PDO 3**: Configurable voltage up to 20V
+
+The module automatically selects the appropriate PDO based on requested voltage and configures it with the desired current limit.
+
+## API Endpoints
+
+All API endpoints support both session-based (web interface) and token-based (API) authentication:
+
+### Status and Monitoring
+
+```bash
+# Get current PD status and readings
+GET /usb_pd/api/status
+# Response: {"success": true, "connected": true, "voltage": 12.0, "current": 2.0}
+
+# Get available voltage options
+GET /usb_pd/api/voltages  
+# Response: {"voltages": [5.0, 9.0, 12.0, 15.0, 20.0]}
+
+# Get available current options
+GET /usb_pd/api/currents
+# Response: {"currents": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]}
+
+# Get all PDO profiles
+GET /usb_pd/api/profiles
+# Response: {"pdos": [...], "activePDO": 2}
+```
+
+### Control Operations
+
+```bash
+# Set new voltage and current configuration
+POST /usb_pd/api/configure
+Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN
+
+{
+  "voltage": 12.0,
+  "current": 2.0
+}
+
+# Response: {"success": true, "voltage": 12.0, "current": 2.0}
+```
+
+## OpenAPI 3.0 Integration
+
+When OpenAPI documentation is enabled, the USB PD Controller provides comprehensive API documentation:
+
+```cpp
+// All endpoints are documented with maker-friendly tags
+ApiRoute("/api/status", WebModule::WM_GET, statusHandler, {AuthType::LOCAL_ONLY},
+         API_DOC("Get Power Delivery status",
+                 "Returns current PD board connection status and voltage/current readings",
+                 "getPDStatus", {"maker", "power"}));
+```
+
+### Using with Maker API
+
+The USB PD Controller integrates seamlessly with the [Maker API module](https://github.com/andrewmherren/maker_api) for interactive testing:
+
+```cpp
+// Register both modules for complete API testing experience  
+webPlatform.registerModule("/api-explorer", &makerAPI);
+webPlatform.registerModule("/usb_pd", &usbPDController, usbPdConfig);
+```
+
+Access the API explorer at `/api-explorer/` to interactively test USB PD endpoints.
+
+## Security and Authentication
+
+### Route-Level Security
+
+- **Monitoring Endpoints**: Local network access only for security
+- **Control Endpoints**: Require authentication (session or API token)
+- **Configuration Changes**: Protected with CSRF tokens when using web interface
+- **API Access**: Secure token-based authentication for programmatic control
+
+### Authentication Types
+
+```cpp
+// Monitoring - local network only
+{AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN}
+
+// Control operations - authentication required
+{AuthType::SESSION, AuthType::PAGE_TOKEN}
+```
+
+## Error Handling
+
+The module provides comprehensive error handling:
+
+```json
+// Board not connected
+{"success": false, "error": "PD board not connected"}
+
+// Invalid configuration
+{"success": false, "error": "Invalid values - voltage must be 5.0-20.0V, current must be 0.5-3.0A"}
+
+// Configuration failure
+{"success": false, "error": "Failed to set configuration"}
+```
 
 ## Troubleshooting
 
-- **Board Not Detected**: Make sure the I2C connections are correct and the STUSB4500 board is properly powered.
-- **Power Not Changing**: Some power supplies may not support all voltage/current combinations. Try different values.
-- **Web Interface Not Loading**: Ensure your WiFi connection is stable and the ESP32 is properly connected to your network.
+### Common Issues
 
-## Dependencies
+**Board not detected**: 
+- Check I2C wiring and connections
+- Verify power supply to STUSB4500 board
+- Confirm I2C pins in configuration match physical wiring
 
-- **web_module_interface** - Abstract interface for web module integration
-- Wire library (for I2C communication)
-- SparkFun STUSB4500 Arduino Library
-- ArduinoJson library (for API responses)
+**Configuration not applying**:
+- Ensure power supply supports requested voltage/current combination
+- Check that PD-capable device is connected to output
+- Some power supplies require negotiation time after configuration changes
 
-## Architecture
+**Web interface not loading**:
+- Verify ESP32 is connected to WiFi network
+- Check authentication - login may be required
+- Ensure WebPlatform is properly initialized
 
-This module follows modern architecture patterns:
+**API calls failing**:
+- Verify authentication token is valid
+- Check Content-Type header for POST requests
+- Ensure request body is valid JSON format
 
-- **IWebModule Implementation**: Implements standard interface for web router integration
-- **Global Instance**: Provides global `usbPDController` instance accessible from any module
-- **Module Independence**: Functions as a standalone module with clear dependencies
+### Debug Output
 
-## Installation
+Enable debug output to see detailed I2C and configuration information:
 
-1. Install the required libraries through PlatformIO:
-   ```ini
-   lib_deps = 
-     https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
-     bblanchon/ArduinoJson@^6.20.0
-     https://github.com/andrewmherren/web_module_interface.git
-   ```
-   
-2. Create a new project with the appropriate board selected
-   
-3. Add the USB PD Controller module to your project
-   
-4. Use the example code as a starting point for your project
+```cpp
+// Enable debug output before webPlatform.begin()
+Serial.setDebugOutput(true);
+```
 
-## License
+Debug output shows:
+- I2C initialization with configured pins
+- Board detection and connection status  
+- Configuration parsing and validation
+- PDO profile selection and updates
 
-MIT License
+## Integration Examples
 
-Copyright (c) 2023-2024 Your Name
+### Complete Project Example
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+```cpp
+#include <web_platform.h>
+#include <usb_pd_controller.h>
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+void setup() {
+  Serial.begin(115200);
+  
+  // Device navigation
+  std::vector<NavigationItem> navItems = {
+    NavigationItem("Dashboard", "/"),
+    NavigationItem("USB PD Control", "/usb_pd/"),
+    NavigationItem("Settings", "/settings/"),
+    Authenticated(NavigationItem("Account", "/account")),
+    Authenticated(NavigationItem("Logout", "/logout")),
+    Unauthenticated(NavigationItem("Login", "/login"))
+  };
+  webPlatform.setNavigationMenu(navItems);
+  
+  // Configure USB PD module for ESP32-S3
+  StaticJsonDocument<128> pdConfig;
+  pdConfig["SDA"] = 4;
+  pdConfig["SCL"] = 5;
+  pdConfig["board"] = "sparkfun";
+  
+  webPlatform.registerModule("/usb_pd", &usbPDController, pdConfig.as<JsonVariant>());
+  webPlatform.begin("PowerHub", "1.0.0");
+  
+  // Add custom dashboard route
+  if (webPlatform.isConnected()) {
+    webPlatform.registerWebRoute("/", [](WebRequest& req, WebResponse& res) {
+      String html = R"(
+        <div class="container">
+          <h1>Power Hub Dashboard</h1>
+          <div class="status-grid">
+            <div class="status-card">
+              <h3>USB-C PD Control</h3>
+              <p>Configure voltage and current output</p>
+              <a href="/usb_pd/" class="btn btn-primary">Open Control Panel</a>
+            </div>
+          </div>
+        </div>
+      )";
+      res.setContent(html, "text/html");
+    }, {AuthType::LOCAL_ONLY});
+  }
+}
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+void loop() {
+  webPlatform.handle();
+  delay(10); // Allow ESP32 system tasks to run
+}
+```
+
+### API Integration Example
+
+```cpp
+// Programmatically set PD configuration
+void setPowerProfile(float voltage, float current) {
+  if (webPlatform.isConnected()) {
+    // Use internal API or external HTTP calls
+    usbPDController.setPDConfig(voltage, current);
+    
+    Serial.printf("Set power profile: %.1fV @ %.1fA\n", voltage, current);
+  }
+}
+
+// Check current power status
+void checkPowerStatus() {
+  if (usbPDController.isPDBoardConnected()) {
+    usbPDController.readPDConfig();
+    Serial.printf("Current output: %.1fV @ %.1fA\n", 
+                  usbPDController.getCurrentVoltage(), 
+                  usbPDController.getCurrentCurrent());
+  } else {
+    Serial.println("PD board not connected");
+  }
+}
+
+void loop() {
+  webPlatform.handle();
+  
+  // Example of periodic status check
+  static unsigned long lastCheck = 0;
+  if (millis() - lastCheck > 30000) { // Check every 30 seconds
+    checkPowerStatus();
+    lastCheck = millis();
+  }
+  
+  delay(10); // Allow ESP32 system tasks to run
+}
+```
+
+## WebPlatform Module Ecosystem
+
+The USB PD Controller is part of the growing WebPlatform module ecosystem:
+
+- **[Web Platform](https://github.com/andrewmherren/web_platform)**: Core framework with authentication, routing, and web services
+- **[Maker API](https://github.com/andrewmherren/maker_api)**: Interactive API documentation and testing interface
+- **USB PD Controller**: This module - USB-C Power Delivery control and monitoring
+
+## Memory Efficiency
+
+The module is designed for optimal ESP32 memory usage:
+
+- **PROGMEM Assets**: Web interface assets stored in flash memory
+- **Efficient JSON**: Minimal JSON document sizes for API responses
+- **Connection Caching**: I2C connection status cached to reduce bus traffic
+- **Optional Features**: OpenAPI documentation can be disabled to save memory
+
+## Hardware Compatibility
+
+**Tested Platforms:**
+- ESP32-S3 (primary development platform)
+- ESP32 (basic compatibility)
+
+**Supported PD Controllers:**
+- SparkFun STUSB4500 breakout board (current)
+- Future boards through extensible architecture
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Areas of interest:
+
+- **Additional Board Support**: Support for other USB-C PD controller boards
+- **Enhanced Monitoring**: Additional power metrics and logging
+- **Safety Features**: Overcurrent/overvoltage protection and alerts
+- **UI Improvements**: Enhanced web interface with better visualizations
+
+## License
+
+This module is part of the WebPlatform ecosystem and follows the same MIT licensing terms.
+
+**Made with ⚡ for the ESP32 maker community**

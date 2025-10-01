@@ -33,7 +33,7 @@ async function fetchCurrentConfig() {
   document.getElementById('retryContainer').classList.add('hidden');
   
   try {
-    const data = await AuthUtils.fetchJSON('pd-status');
+    const data = await AuthUtils.fetchJSON('api/status');
     if (data.success) {
       // Success case - PD board connected and values read
       document.getElementById('currentVoltage').innerText = data.voltage;
@@ -88,15 +88,17 @@ async function fetchCurrentConfig() {
 async function loadAvailableOptions() {
   try {
     // Load available voltages
-    const voltages = await AuthUtils.fetchJSON('available-voltages');
+    const voltageResponse = await AuthUtils.fetchJSON('api/voltages');
     const voltageSelect = document.getElementById('voltageSelect');
     voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
-    voltages.forEach(voltage => {
-      const option = document.createElement('option');
-      option.value = voltage;
-      option.text = voltage + ' V';
-      voltageSelect.appendChild(option);
-    });
+    if (voltageResponse.voltages && Array.isArray(voltageResponse.voltages)) {
+      voltageResponse.voltages.forEach(voltage => {
+        const option = document.createElement('option');
+        option.value = voltage;
+        option.text = voltage + ' V';
+        voltageSelect.appendChild(option);
+      });
+    }
     // Update button state after loading options
     updateApplyButtonState();
   } catch (error) {
@@ -105,15 +107,17 @@ async function loadAvailableOptions() {
   
   try {
     // Load available currents
-    const currents = await AuthUtils.fetchJSON('available-currents');
+    const currentResponse = await AuthUtils.fetchJSON('api/currents');
     const currentSelect = document.getElementById('currentSelect');
     currentSelect.innerHTML = '<option value="">Select current...</option>';
-    currents.forEach(current => {
-      const option = document.createElement('option');
-      option.value = current;
-      option.text = current + ' A';
-      currentSelect.appendChild(option);
-    });
+    if (currentResponse.currents && Array.isArray(currentResponse.currents)) {
+      currentResponse.currents.forEach(current => {
+        const option = document.createElement('option');
+        option.value = current;
+        option.text = current + ' A';
+        currentSelect.appendChild(option);
+      });
+    }
     // Update button state after loading options
     updateApplyButtonState();
   } catch (error) {
@@ -159,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
   const applyBtn = document.getElementById('applyBtn');
   if (applyBtn) {
-    applyBtn.addEventListener('click', function() {
+    applyBtn.addEventListener('click', async function() {
       const voltage = document.getElementById('voltageSelect').value;
       const current = document.getElementById('currentSelect').value;
       
@@ -175,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('statusMessage').classList.remove('hidden');
       
       try {
-        const data = await AuthUtils.fetchJSON('set-pd-config', {
+        const data = await AuthUtils.fetchJSON('api/configure', {
           method: 'POST',
           body: JSON.stringify({
             voltage: parseFloat(voltage),
@@ -274,7 +278,7 @@ function setFormEnabled(enabled) {
 // Load PDO profiles
 async function loadPDOProfiles() {
   try {
-    const data = await AuthUtils.fetchJSON('pdo-profiles');
+    const data = await AuthUtils.fetchJSON('api/profiles');
     const container = document.getElementById('pdoProfiles');
     
     if (data.error) {

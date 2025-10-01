@@ -28,6 +28,7 @@ public:
 
   // Module lifecycle methods (IWebModule interface)
   void begin() override;
+  void begin(const JsonVariant &config) override;
   void handle() override;
 
   // IWebModule interface implementation
@@ -51,9 +52,6 @@ public:
   // Get all PDO profiles as JSON string
   String getAllPDOProfiles();
 
-  // Get the main HTML content for this module
-  String getMainPageHtml() const;
-
   // Route handler methods
   void mainPageHandler(WebRequest &req, WebResponse &res);
   void pdStatusHandler(WebRequest &req, WebResponse &res);
@@ -72,8 +70,14 @@ private:
   unsigned long lastCheckTime;
   uint8_t i2cAddress;
 
-  // Initialize hardware with I2C address
-  void initializeHardware(uint8_t i2cAddress = 0x28);
+  // I2C configuration
+  int sdaPin;
+  int sclPin;
+  String boardType;
+
+  // Initialize I2C and hardware with configuration
+  void initializeHardware();
+  void parseConfig(const JsonVariant &config);
 };
 
 // Global instance

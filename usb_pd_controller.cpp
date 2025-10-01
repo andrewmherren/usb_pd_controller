@@ -9,20 +9,28 @@ USBPDController usbPDController;
 // USBPDController implementation
 USBPDController::USBPDController()
     : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
-      lastCheckTime(0), i2cAddress(0x28) {}
+      lastCheckTime(0), i2cAddress(0x28), sdaPin(4), sclPin(5),
+      boardType("sparkfun") {}
 
 void USBPDController::begin() {
   Serial.println("USB PD Controller module initialized");
-  initializeHardware(); // Use default I2C address
+  initializeHardware();
 }
 
-void USBPDController::initializeHardware(uint8_t i2cAddress) {
-  // Set the I2C address
-  this->i2cAddress = i2cAddress;
+void USBPDController::begin(const JsonVariant &config) {
+  parseConfig(config);
+  begin(); // Call the parameterless version
+}
 
+void USBPDController::initializeHardware() {
   DEBUG_PRINTLN("Initializing USB PD Controller hardware...");
   DEBUG_PRINT("Using I2C address: 0x");
   DEBUG_PRINTLN(String(i2cAddress, HEX));
+  DEBUG_PRINTF("I2C pins: SDA=%d, SCL=%d\n", sdaPin, sclPin);
+  DEBUG_PRINTF("Board type: %s\n", boardType.c_str());
+
+  // Initialize I2C with configured pins
+  Wire.begin(sdaPin, sclPin);
 
   // Check if PD board is connected
   pdBoardConnected = isPDBoardConnected();
@@ -71,7 +79,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
                    [this](WebRequest &req, WebResponse &res) {
                      mainPageHandler(req, res);
                    },
-                   {AuthType::LOCAL_ONLY}),
+                   {AuthType::NONE}),
 
           // JavaScript assets - local access only
           WebRoute("/assets/usb-pd-controller.js", WebModule::WM_GET,
@@ -79,7 +87,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
                      res.setProgmemContent(USB_PD_JS, "application/javascript");
                      res.setHeader("Cache-Control", "public, max-age=3600");
                    },
-                   {AuthType::LOCAL_ONLY}),
+                   {AuthType::NONE}),
 
           // API endpoints - authentication required for control, local access
           // for monitoring
@@ -88,7 +96,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               [this](WebRequest &req, WebResponse &res) {
                 pdStatusHandler(req, res);
               },
-              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get Power Delivery status",
                       "Returns current PD board connection status and "
                       "voltage/current readings",
@@ -99,7 +107,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               [this](WebRequest &req, WebResponse &res) {
                 availableVoltagesHandler(req, res);
               },
-              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get available voltages",
                       "Returns list of supported voltage levels",
                       "getAvailableVoltages", {"maker", "power"})),
@@ -109,7 +117,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               [this](WebRequest &req, WebResponse &res) {
                 availableCurrentsHandler(req, res);
               },
-              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get available currents",
                       "Returns list of supported current levels",
                       "getAvailableCurrents", {"maker", "power"})),
@@ -119,7 +127,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               [this](WebRequest &req, WebResponse &res) {
                 pdoProfilesHandler(req, res);
               },
-              {AuthType::LOCAL_ONLY, AuthType::SESSION, AuthType::PAGE_TOKEN},
+              {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get PDO profiles",
                       "Returns Power Delivery Object profiles with voltage, "
                       "current and power specifications",
@@ -130,8 +138,8 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               [this](WebRequest &req, WebResponse &res) {
                 setPDConfigHandler(req, res);
               },
-              {AuthType::SESSION,
-               AuthType::PAGE_TOKEN}, // Require authentication for control
+              {AuthType::SESSION, AuthType::PAGE_TOKEN,
+               AuthType::TOKEN}, // Require authentication for control
               API_DOC("Set Power Delivery configuration",
                       "Updates the USB-C PD voltage and current settings",
                       "setPDConfig", {"maker", "power"})
@@ -274,10 +282,6 @@ String USBPDController::getAllPDOProfiles() {
 
   json += "],\"activePDO\":" + String(pdController.getPdoNumber()) + "}";
   return json;
-}
-
-String USBPDController::getMainPageHtml() const {
-  return String(FPSTR(USB_PD_HTML));
 }
 
 // Route handler implementations
@@ -428,5 +432,45 @@ void USBPDController::setPDConfigHandler(WebRequest &req, WebResponse &res) {
       json["success"] = false;
       json["error"] = "Failed to set configuration";
     });
+  }
+}
+
+void USBPDController::parseConfig(const JsonVariant &config) {
+  if (config.isNull()) {
+    DEBUG_PRINTLN("USB PD Controller: Using default configuration");
+    return;
+  }
+
+  // Parse I2C pin configuration
+  if (config.containsKey("SDA")) {
+    sdaPin = config["SDA"].as<int>();
+    DEBUG_PRINTF("USB PD Controller: Configured SDA pin: %d\n", sdaPin);
+  }
+
+  if (config.containsKey("SCL")) {
+    sclPin = config["SCL"].as<int>();
+    DEBUG_PRINTF("USB PD Controller: Configured SCL pin: %d\n", sclPin);
+  }
+
+  // Parse board type
+  if (config.containsKey("board")) {
+    boardType = config["board"].as<String>();
+    DEBUG_PRINTF("USB PD Controller: Configured board type: %s\n",
+                 boardType.c_str());
+
+    // Validate board type
+    if (boardType != "sparkfun") {
+      DEBUG_PRINTF("USB PD Controller: WARNING - Unsupported board type "
+                   "'%s', using 'sparkfun'\n",
+                   boardType.c_str());
+      boardType = "sparkfun";
+    }
+  }
+
+  // Parse I2C address if provided
+  if (config.containsKey("i2cAddress")) {
+    i2cAddress = config["i2cAddress"].as<uint8_t>();
+    DEBUG_PRINTF("USB PD Controller: Configured I2C address: 0x%02X\n",
+                 i2cAddress);
   }
 }
