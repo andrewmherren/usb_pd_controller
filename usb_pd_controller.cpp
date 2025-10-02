@@ -100,7 +100,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               API_DOC("Get Power Delivery status",
                       "Returns current PD board connection status and "
                       "voltage/current readings",
-                      "getPDStatus", {"maker", "power"})),
+                      "getPDStatus", {"power delivery"})),
 
           ApiRoute(
               "/api/voltages", WebModule::WM_GET,
@@ -110,7 +110,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get available voltages",
                       "Returns list of supported voltage levels",
-                      "getAvailableVoltages", {"maker", "power"})),
+                      "getAvailableVoltages", {"power delivery"})),
 
           ApiRoute(
               "/api/currents", WebModule::WM_GET,
@@ -120,7 +120,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
               API_DOC("Get available currents",
                       "Returns list of supported current levels",
-                      "getAvailableCurrents", {"maker", "power"})),
+                      "getAvailableCurrents", {"power delivery"})),
 
           ApiRoute(
               "/api/profiles", WebModule::WM_GET,
@@ -131,7 +131,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
               API_DOC("Get PDO profiles",
                       "Returns Power Delivery Object profiles with voltage, "
                       "current and power specifications",
-                      "getPDOProfiles", {"maker", "power"})),
+                      "getPDOProfiles", {"power delivery"})),
 
           ApiRoute(
               "/api/configure", WebModule::WM_POST,
@@ -142,7 +142,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
                AuthType::TOKEN}, // Require authentication for control
               API_DOC("Set Power Delivery configuration",
                       "Updates the USB-C PD voltage and current settings",
-                      "setPDConfig", {"maker", "power"})
+                      "setPDConfig", {"power delivery"})
                   .withRequestBody(R"({
           "required": true,
           "content": {
