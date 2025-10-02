@@ -42,6 +42,7 @@ board = esp32-s3-devkitc-1
 framework = arduino
 lib_deps = 
   https://github.com/andrewmherren/web_platform.git
+  https://github.com/andrewmherren/usb_pd_controller.git
   https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git
   bblanchon/ArduinoJson@^6.20.0
 
