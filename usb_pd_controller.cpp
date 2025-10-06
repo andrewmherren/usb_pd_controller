@@ -215,33 +215,49 @@ bool USBPDController::setPDConfig(float voltage, float current) {
     return false;
   }
 
-  // Find appropriate PDO to modify
-  int pdoToModify = 0;
+  // Read current configuration first
+  pdController.read();
 
   if (voltage == 5.0) {
-    // Use PDO1 which is fixed at 5V
-    pdoToModify = 1;
+    // Use PDO1 only for 5V
     pdController.setCurrent(1, current);
+    // Enable only PDO1
+    pdController.setPdoNumber(1);
+    DEBUG_PRINTLN("Configuring for 5V (PDO1 only)");
   } else if (voltage <= 12.0) {
-    // Use PDO2 for voltages up to 12V
-    pdoToModify = 2;
+    // Configure PDO2 for desired voltage/current
     pdController.setVoltage(2, voltage);
     pdController.setCurrent(2, current);
+    // Keep PDO1 as fallback
+    pdController.setCurrent(1, current);
+    // Enable PDO1 and PDO2 (PDO2 has priority)
+    pdController.setPdoNumber(2);
+    DEBUG_PRINTF("Configuring for %.1fV (PDO2 priority, PDO1 fallback)\n",
+                 voltage);
   } else {
-    // Use PDO3 for higher voltages
-    pdoToModify = 3;
+    // Configure PDO3 for higher voltages
     pdController.setVoltage(3, voltage);
     pdController.setCurrent(3, current);
+    // Configure reasonable PDO2 as middle fallback
+    pdController.setVoltage(2, 12.0);
+    pdController.setCurrent(2, current);
+    // Keep PDO1 as final fallback
+    pdController.setCurrent(1, current);
+    // Enable all 3 PDOs (PDO3 has highest priority)
+    pdController.setPdoNumber(3);
+    DEBUG_PRINTF(
+        "Configuring for %.1fV (PDO3 priority, PDO2 and PDO1 fallback)\n",
+        voltage);
   }
-
-  // Set this PDO as highest priority
-  pdController.setPdoNumber(pdoToModify);
 
   // Write the settings to the device
   pdController.write();
 
   // Soft reset to apply changes immediately
   pdController.softReset();
+
+  // Add a small delay to allow negotiation
+  delay(100);
 
   // Read back the actual values from the board to confirm
   if (readPDConfig()) {
@@ -338,8 +354,11 @@ void USBPDController::availableCurrentsHandler(WebRequest &req,
     JsonArray currents = json.createNestedArray("currents");
     currents.add(0.5);
     currents.add(1.0);
+    currents.add(1.33);
     currents.add(1.5);
+    currents.add(1.67);
     currents.add(2.0);
+    currents.add(2.25);
     currents.add(2.5);
     currents.add(3.0);
   });

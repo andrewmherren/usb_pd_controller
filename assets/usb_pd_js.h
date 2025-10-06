@@ -87,10 +87,11 @@ async function fetchCurrentConfig() {
 
 async function loadAvailableOptions() {
   try {
-    // Load available voltages
+    // Load voltage options
     const voltageResponse = await AuthUtils.fetchJSON('api/voltages');
     const voltageSelect = document.getElementById('voltageSelect');
     voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
+    
     if (voltageResponse.voltages && Array.isArray(voltageResponse.voltages)) {
       voltageResponse.voltages.forEach(voltage => {
         const option = document.createElement('option');
@@ -99,17 +100,23 @@ async function loadAvailableOptions() {
         voltageSelect.appendChild(option);
       });
     }
-    // Update button state after loading options
+    
+    // Add event listener for voltage changes to filter currents  
+    voltageSelect.addEventListener('change', function() {
+      updateCurrentOptions();
+    });
+    
     updateApplyButtonState();
   } catch (error) {
-    console.error('Error loading available voltages:', error);
+    console.error('Error loading voltages:', error);
   }
   
   try {
-    // Load available currents
+    // Load current options
     const currentResponse = await AuthUtils.fetchJSON('api/currents');
     const currentSelect = document.getElementById('currentSelect');
     currentSelect.innerHTML = '<option value="">Select current...</option>';
+    
     if (currentResponse.currents && Array.isArray(currentResponse.currents)) {
       currentResponse.currents.forEach(current => {
         const option = document.createElement('option');
@@ -118,11 +125,141 @@ async function loadAvailableOptions() {
         currentSelect.appendChild(option);
       });
     }
-    // Update button state after loading options
+    
+    // Add event listener for current changes to filter voltages
+    if (currentSelect) {
+      currentSelect.addEventListener('change', function() {
+        updateVoltageOptions();
+      });
+    }
+    
     updateApplyButtonState();
   } catch (error) {
-    console.error('Error loading available currents:', error);
+    console.error('Error loading currents:', error);
   }
+}
+
+function updateCurrentOptions() {
+  const voltageSelect = document.getElementById('voltageSelect');
+  const currentSelect = document.getElementById('currentSelect');
+  const selectedVoltage = parseFloat(voltageSelect.value);
+  
+  // Save current selection
+  const currentValue = currentSelect.value;
+  
+  if (!selectedVoltage || isNaN(selectedVoltage)) {
+    // If no voltage selected, show all currents
+    currentSelect.innerHTML = '<option value="">Select current...</option>';
+    const allCurrents = [0.5, 1.0, 1.33, 1.5, 1.67, 2.0, 2.25, 2.5, 3.0];
+    allCurrents.forEach(current => {
+      const option = document.createElement('option');
+      option.value = current;
+      option.text = current + ' A';
+      currentSelect.appendChild(option);
+    });
+    
+    // Restore selection if it was valid
+    if (currentValue) {
+      currentSelect.value = currentValue;
+    }
+    
+    updateApplyButtonState();
+    return;
+  }
+  
+  // Clear and repopulate based on voltage
+  currentSelect.innerHTML = '<option value="">Select current...</option>';
+  
+  // Define realistic current limits based on common PD profiles
+  let maxCurrent = 3.0; // Default max
+  
+  if (selectedVoltage === 5.0) {
+    maxCurrent = 3.0;  // USB-C can do 5V@3A
+  } else if (selectedVoltage === 9.0) {
+    maxCurrent = 2.25; // Common 9V profile is 2.25A (20W)
+  } else if (selectedVoltage === 12.0) {
+    maxCurrent = 1.67; // Common 12V profile is 1.67A (20W)
+  } else if (selectedVoltage === 15.0) {
+    maxCurrent = 1.33; // 15V@1.33A = 20W
+  } else if (selectedVoltage === 20.0) {
+    maxCurrent = 1.0;  // 20V@1A = 20W
+  }
+  
+  // Standard current options
+  const allCurrents = [0.5, 1.0, 1.33, 1.5, 1.67, 2.0, 2.25, 2.5, 3.0];
+  
+  allCurrents.forEach(current => {
+    if (current <= maxCurrent + 0.01) { // Small tolerance
+      const option = document.createElement('option');
+      option.value = current;
+      option.text = current + ' A';
+      currentSelect.appendChild(option);
+    }
+  });
+  
+  // Restore selection if still valid
+  if (currentValue && parseFloat(currentValue) <= maxCurrent + 0.01) {
+    currentSelect.value = currentValue;
+  }
+  
+  updateApplyButtonState();
+}
+
+function updateVoltageOptions() {
+  const voltageSelect = document.getElementById('voltageSelect');
+  const currentSelect = document.getElementById('currentSelect');
+  const selectedCurrent = parseFloat(currentSelect.value);
+  
+  // Save current voltage selection
+  const voltageValue = voltageSelect.value;
+  
+  if (!selectedCurrent || isNaN(selectedCurrent)) {
+    // If no current selected, show all voltages
+    voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
+    const allVoltages = [5.0, 9.0, 12.0, 15.0, 20.0];
+    allVoltages.forEach(voltage => {
+      const option = document.createElement('option');
+      option.value = voltage;
+      option.text = voltage + ' V';
+      voltageSelect.appendChild(option);
+    });
+    
+    // Restore selection if it was valid
+    if (voltageValue) {
+      voltageSelect.value = voltageValue;
+    }
+    
+    updateApplyButtonState();
+    return;
+  }
+  
+  // Clear and repopulate based on current
+  voltageSelect.innerHTML = '<option value="">Select voltage...</option>';
+  
+  // Define which voltages can support the selected current
+  const voltageCurrentLimits = {
+    5.0: 3.0,   // 5V can do up to 3A
+    9.0: 2.25,  // 9V can do up to 2.25A
+    12.0: 1.67, // 12V can do up to 1.67A
+    15.0: 1.33, // 15V can do up to 1.33A
+    20.0: 1.0   // 20V can do up to 1A
+  };
+  
+  Object.entries(voltageCurrentLimits).forEach(([voltage, maxCurrent]) => {
+    if (selectedCurrent <= maxCurrent + 0.01) { // Small tolerance
+      const option = document.createElement('option');
+      option.value = parseFloat(voltage);
+      option.text = voltage + ' V';
+      voltageSelect.appendChild(option);
+    }
+  });
+  
+  // Restore selection if still valid
+  if (voltageValue && voltageCurrentLimits[voltageValue] && selectedCurrent <= voltageCurrentLimits[voltageValue] + 0.01) {
+    voltageSelect.value = voltageValue;
+  }
+  
+  updateApplyButtonState();
 }
 
 function selectOptionByValue(selectId, value) {
@@ -259,6 +396,14 @@ document.addEventListener('DOMContentLoaded', function() {
       loadPDOProfiles();
     });
   }
+  
+  // PDO refresh button click handler
+  const refreshPDOBtn = document.getElementById('refreshPDOBtn');
+  if (refreshPDOBtn) {
+    refreshPDOBtn.addEventListener('click', function() {
+      loadPDOProfiles();
+    });
+  }
 });
 
 function setFormEnabled(enabled) {
@@ -282,21 +427,22 @@ async function loadPDOProfiles() {
     const container = document.getElementById('pdoProfiles');
     
     if (data.error) {
-      container.innerHTML = '<div>Error: ' + data.error + '</div>';
+      container.innerHTML = '<div class="info-message">' + data.error + '</div>';
       return;
     }
     
     // Check if pdos array exists and is not empty
     if (!data.pdos || !Array.isArray(data.pdos) || data.pdos.length === 0) {
-      container.innerHTML = '<div>No PDO profiles available. Device may be disconnected.</div>';
+      container.innerHTML = '<div class="info-message">No PDO profiles available. Device may be disconnected.</div>';
       return;
     }
     
     let html = '';
+    
     data.pdos.forEach(pdo => {
       const cardClass = pdo.active ? 'pdo-card active' : (pdo.fixed ? 'pdo-card fixed' : 'pdo-card');
       const badgeClass = pdo.active ? 'pdo-badge active' : (pdo.fixed ? 'pdo-badge fixed' : 'pdo-badge');
-      const badgeText = pdo.active ? 'ACTIVE' : (pdo.fixed ? 'FIXED' : 'AVAILABLE');
+      const badgeText = pdo.active ? 'ACTIVE' : (pdo.fixed ? 'FIXED' : 'CONFIGURED');
       
       html += `
         <div class="${cardClass}">
@@ -307,7 +453,7 @@ async function loadPDOProfiles() {
           <div class="pdo-details">
             <div><strong>${pdo.voltage}V</strong> @ <strong>${pdo.current}A</strong></div>
             <div>Max Power: <strong>${pdo.power.toFixed(1)}W</strong></div>
-            ${pdo.fixed ? '<div><em>Fixed 5V profile</em></div>' : ''}
+            ${pdo.fixed ? '<div><em>Fixed 5V USB-C standard</em></div>' : ''}
           </div>
         </div>
       `;
