@@ -3,8 +3,10 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <SparkFun_STUSB4500.h>
 #include <Wire.h>
 #include <web_platform.h>
+
 
 // Forward declaration of WebPlatform (from web_platform.h)
 extern class WebPlatform webPlatform;
@@ -14,10 +16,6 @@ extern class WebPlatform webPlatform;
 // stusb4500_register_map.h We need to be careful with any DEFAULT definitions
 // in the Arduino core
 #pragma push_macro("DEFAULT")
-#undef DEFAULT
-
-// Include the SparkFun library
-#include <SparkFun_STUSB4500.h>
 
 // Restore the original DEFAULT definition if it existed
 #pragma pop_macro("DEFAULT")
@@ -64,16 +62,16 @@ private:
   STUSB4500 pdController;
 
   // Current PD settings
-  float currentVoltage;
-  float currentCurrent;
-  bool pdBoardConnected;
-  unsigned long lastCheckTime;
-  uint8_t i2cAddress;
+  float currentVoltage = 0.0;
+  float currentCurrent = 0.0;
+  bool pdBoardConnected = false;
+  unsigned long lastCheckTime = 0;
+  uint8_t i2cAddress = 0x28;
 
   // I2C configuration
-  int sdaPin;
-  int sclPin;
-  String boardType;
+  int sdaPin = 4;
+  int sclPin = 5;
+  String boardType = "sparkfun";
 
   // Initialize I2C and hardware with configuration
   void initializeHardware();

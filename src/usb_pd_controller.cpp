@@ -1,16 +1,13 @@
 #include "usb_pd_controller.h"
-#include "assets/usb_pd_html.h"
-#include "assets/usb_pd_js.h"
+#include "../assets/usb_pd_html.h"
+#include "../assets/usb_pd_js.h"
 #include <web_platform.h>
 
 // Create global instance of USBPDController
 USBPDController usbPDController;
 
 // USBPDController implementation
-USBPDController::USBPDController()
-    : currentVoltage(0.0), currentCurrent(0.0), pdBoardConnected(false),
-      lastCheckTime(0), i2cAddress(0x28), sdaPin(4), sclPin(5),
-      boardType("sparkfun") {}
+USBPDController::USBPDController() {}
 
 void USBPDController::begin() {
   Serial.println("USB PD Controller module initialized");
@@ -52,24 +49,32 @@ void USBPDController::initializeHardware() {
 }
 
 void USBPDController::handle() {
-  // Periodically check if PD board connection status has changed
-  if (millis() - lastCheckTime >
-      30000) { // Check every 30 seconds to reduce I2C spam
-    lastCheckTime = millis();
+  // Check if it's time to check PD board status (every 30 seconds to reduce I2C
+  // spam)
+  if (millis() - lastCheckTime <= 30000) {
+    return;
+  }
 
-    bool connected = isPDBoardConnected();
-    if (connected != pdBoardConnected) {
-      if (connected) {
-        DEBUG_PRINTLN("PD board connected");
-        pdBoardConnected = pdController.begin();
-        if (pdBoardConnected) {
-          readPDConfig();
-        }
-      } else {
-        DEBUG_PRINTLN("PD board disconnected");
-        pdBoardConnected = false;
-      }
-    }
+  lastCheckTime = millis();
+  bool connected = isPDBoardConnected();
+
+  // No change in connection status
+  if (connected == pdBoardConnected) {
+    return;
+  }
+
+  // Handle disconnection
+  if (!connected) {
+    DEBUG_PRINTLN("PD board disconnected");
+    pdBoardConnected = false;
+    return;
+  }
+
+  // Handle connection
+  DEBUG_PRINTLN("PD board connected");
+  pdBoardConnected = pdController.begin();
+  if (pdBoardConnected) {
+    readPDConfig();
   }
 }
 
@@ -271,7 +276,7 @@ bool USBPDController::setPDConfig(float voltage, float current) {
 
 String USBPDController::getAllPDOProfiles() {
   if (!pdBoardConnected) {
-    return "{\"error\":\"PD board not connected\"}";
+    return R"({\"error\":\"PD board not connected\"})";
   }
 
   String json = "{\"pdos\":[";
@@ -339,7 +344,7 @@ void USBPDController::pdStatusHandler(WebRequest &req, WebResponse &res) {
 void USBPDController::availableVoltagesHandler(WebRequest &req,
                                                WebResponse &res) {
   JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
-    JsonArray voltages = json.createNestedArray("voltages");
+    JsonArray voltages = json["voltages"].to<JsonArray>();
     voltages.add(5.0);
     voltages.add(9.0);
     voltages.add(12.0);
@@ -351,7 +356,7 @@ void USBPDController::availableVoltagesHandler(WebRequest &req,
 void USBPDController::availableCurrentsHandler(WebRequest &req,
                                                WebResponse &res) {
   JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
-    JsonArray currents = json.createNestedArray("currents");
+    JsonArray currents = json["currents"].to<JsonArray>();
     currents.add(0.5);
     currents.add(1.0);
     currents.add(1.33);
@@ -370,16 +375,16 @@ void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
     JsonResponseBuilder::createResponse(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "PD board not connected";
-      json.createNestedArray("pdos"); // Empty array
+      json["pdos"].to<JsonArray>(); // Empty array
     });
     return;
   }
 
   JsonResponseBuilder::createResponse<512>(res, [&](JsonObject &json) {
-    JsonArray pdos = json.createNestedArray("pdos");
+    JsonArray pdos = json["pdos"].to<JsonArray>();
 
     for (int i = 1; i <= 3; i++) {
-      JsonObject pdo = pdos.createNestedObject();
+      JsonObject pdo = pdos.add().to<JsonObject>();
       float voltage = pdController.getVoltage(i);
       float current = pdController.getCurrent(i);
       bool isActive = (pdController.getPdoNumber() == i);
