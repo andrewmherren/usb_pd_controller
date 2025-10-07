@@ -7,7 +7,7 @@
 USBPDController usbPDController;
 
 // USBPDController implementation
-USBPDController::USBPDController() {}
+USBPDController::USBPDController() = default;
 
 void USBPDController::begin() {
   Serial.println("USB PD Controller module initialized");
@@ -384,7 +384,9 @@ void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
     JsonArray pdos = json["pdos"].to<JsonArray>();
 
     for (int i = 1; i <= 3; i++) {
-      JsonObject pdo = pdos.add().to<JsonObject>();
+      int index = pdos.size();
+      pdos.add(JsonObject());
+      JsonObject pdo = pdos[index];
       float voltage = pdController.getVoltage(i);
       float current = pdController.getCurrent(i);
       bool isActive = (pdController.getPdoNumber() == i);
@@ -405,7 +407,7 @@ void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
 
 void USBPDController::setPDConfigHandler(WebRequest &req, WebResponse &res) {
   // Parse JSON from request body
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   DeserializationError error = deserializeJson(doc, req.getBody());
 
   if (error) {
