@@ -3,26 +3,25 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <SparkFun_STUSB4500.h>
 #include <Wire.h>
-#include <web_platform.h>
+#include <interface/auth_types.h>
+#include <interface/openapi_factory.h>
+#include <interface/openapi_types.h>
+#include <interface/utils/route_variant.h>
+#include <interface/web_module_interface.h>
+#include <interface/web_request.h>
+#include <interface/web_response.h>
+#include <usb_pd_chip.h>
+#include <usb_pd_core.h>
+#include <web_platform_interface.h>
 
-
-// Forward declaration of WebPlatform (from web_platform.h)
-extern class WebPlatform webPlatform;
-
-// Handle DEFAULT definition conflicts with SparkFun library
-// The SparkFun STUSB4500 library defines DEFAULT as 0xFF in
-// stusb4500_register_map.h We need to be careful with any DEFAULT definitions
-// in the Arduino core
-#pragma push_macro("DEFAULT")
-
-// Restore the original DEFAULT definition if it existed
-#pragma pop_macro("DEFAULT")
+// DEFAULT macro conflict handling not needed now that SparkFun headers are
+// isolated behind an adapter
 
 class USBPDController : public IWebModule {
 public:
-  USBPDController(); // Initialize the PD controller
+  // Initialize the PD controller with a chip implementation
+  explicit USBPDController(IUsbPdChip &chip);
 
   // Module lifecycle methods (IWebModule interface)
   void begin() override;
@@ -59,7 +58,8 @@ public:
   void setPDConfigHandler(WebRequest &req, WebResponse &res);
 
 private:
-  STUSB4500 pdController;
+  IUsbPdChip &pdController;
+  USBPDCore core;
 
   // Current PD settings
   float currentVoltage = 0.0;

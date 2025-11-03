@@ -10,7 +10,7 @@
     "authors": [
         {
             "name": "Andrew Herren",
-            "url": "https://github.com/andrewmherren"
+            "url": "https://github.com/andrwemherren"
         }
     ],
     "license": "MIT",
@@ -19,8 +19,14 @@
         "bblanchon/ArduinoJson": "^6.20.0",
         "SparkFun_STUSB4500_Arduino_Library": "https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git"
     },
-    "frameworks": "arduino",
+    "frameworks": "*",
     "platforms": [
         "espressif32"
-    ]
+    ],
+    "export": {
+        "note": "Before release: Add web_platform_interface dependency",
+        "dependencies_for_release": {
+            "andrewmherren/web_platform_interface": "https://github.com/andrewmherren/web_platform_interface.git#cpp_arduino"
+        }
+    }
 }
