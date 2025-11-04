@@ -202,9 +202,7 @@ std::vector<RouteVariant> USBPDController::getHttpsRoutes() {
 }
 
 bool USBPDController::isPDBoardConnected() {
-  Wire.beginTransmission(i2cAddress); // STUSB4500 I2C address
-  (void)Wire.endTransmission();
-  // Use chip probe which performs the same underlying transaction
+  // Rely solely on the chip's probe, which performs the necessary I2C check
   return pdController.probe(i2cAddress);
 }
 
@@ -265,11 +263,7 @@ void USBPDController::mainPageHandler(WebRequestCore &req,
 
 void USBPDController::pdStatusHandler(WebRequestCore &req,
                                       WebResponseCore &res) {
-  IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-#if defined(NATIVE_PLATFORM)
-  (void)platform; // Avoid unused in native build where this TU isn't built
-#endif
-  platform.createJsonResponse(res, [&](JsonObject &json) {
+  respondJson(res, [&](JsonObject &json) {
     // Check if PD board is connected
     bool connected = isPDBoardConnected();
 
@@ -300,8 +294,7 @@ void USBPDController::pdStatusHandler(WebRequestCore &req,
 
 void USBPDController::availableVoltagesHandler(WebRequestCore &req,
                                                WebResponseCore &res) {
-  IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-  platform.createJsonResponse(res, [&](JsonObject &json) {
+  respondJson(res, [&](JsonObject &json) {
     JsonArray voltages = json["voltages"].to<JsonArray>();
     voltages.add(5.0);
     voltages.add(9.0);
@@ -313,8 +306,7 @@ void USBPDController::availableVoltagesHandler(WebRequestCore &req,
 
 void USBPDController::availableCurrentsHandler(WebRequestCore &req,
                                                WebResponseCore &res) {
-  IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-  platform.createJsonResponse(res, [&](JsonObject &json) {
+  respondJson(res, [&](JsonObject &json) {
     JsonArray currents = json["currents"].to<JsonArray>();
     currents.add(0.5);
     currents.add(1.0);
@@ -332,8 +324,7 @@ void USBPDController::pdoProfilesHandler(WebRequestCore &req,
                                          WebResponseCore &res) {
   if (!isPDBoardConnected()) {
     res.setStatus(503); // Service unavailable
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "PD board not connected";
       json["pdos"].to<JsonArray>(); // Empty array
@@ -341,8 +332,7 @@ void USBPDController::pdoProfilesHandler(WebRequestCore &req,
     return;
   }
 
-  IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-  platform.createJsonResponse(res, [&](JsonObject &json) {
+  respondJson(res, [&](JsonObject &json) {
     JsonArray pdos = json["pdos"].to<JsonArray>();
 
     for (int i = 1; i <= 3; i++) {
@@ -375,8 +365,7 @@ void USBPDController::setPDConfigHandler(WebRequestCore &req,
 
   if (error) {
     res.setStatus(400);
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "Invalid JSON";
     });
@@ -389,8 +378,7 @@ void USBPDController::setPDConfigHandler(WebRequestCore &req,
   // Validate values
   if (voltage < 5.0 || voltage > 20.0 || current < 0.5 || current > 3.0) {
     res.setStatus(400);
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "Invalid values - voltage must be 5.0-20.0V, current "
                       "must be 0.5-3.0A";
@@ -401,8 +389,7 @@ void USBPDController::setPDConfigHandler(WebRequestCore &req,
   // Check if PD board is connected
   if (!isPDBoardConnected()) {
     res.setStatus(503);
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "PD board not connected";
     });
@@ -413,16 +400,14 @@ void USBPDController::setPDConfigHandler(WebRequestCore &req,
   bool success = setPDConfig(voltage, current);
 
   if (success) {
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = true;
       json["voltage"] = currentVoltage;
       json["current"] = currentCurrent;
     });
   } else {
     res.setStatus(500);
-    IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
-    platform.createJsonResponse(res, [&](JsonObject &json) {
+    respondJson(res, [&](JsonObject &json) {
       json["success"] = false;
       json["error"] = "Failed to set configuration";
     });

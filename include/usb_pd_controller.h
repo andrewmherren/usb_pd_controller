@@ -13,8 +13,8 @@
 #include <interface/web_module_interface.h>
 #include <usb_pd_chip.h>
 #include <usb_pd_core.h>
+#include <utility>
 #include <web_platform_interface.h>
-
 
 // DEFAULT macro conflict handling not needed now that SparkFun headers are
 // isolated behind an adapter
@@ -77,6 +77,13 @@ private:
   // Initialize I2C and hardware with configuration
   void initializeHardware();
   void parseConfig(const JsonVariant &config);
+
+  // Helper to reduce platform lookup duplication when creating JSON responses
+  template <typename Fn>
+  inline void respondJson(WebResponseCore &res, Fn &&fn) {
+    IWebPlatformProvider::getPlatformInstance().createJsonResponse(
+        res, std::forward<Fn>(fn));
+  }
 };
 
 // Global instance
