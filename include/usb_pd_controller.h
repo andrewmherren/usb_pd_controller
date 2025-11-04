@@ -5,15 +5,16 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <interface/auth_types.h>
+#include <interface/core/web_request_core.h>
+#include <interface/core/web_response_core.h>
 #include <interface/openapi_factory.h>
 #include <interface/openapi_types.h>
 #include <interface/utils/route_variant.h>
 #include <interface/web_module_interface.h>
-#include <interface/web_request.h>
-#include <interface/web_response.h>
 #include <usb_pd_chip.h>
 #include <usb_pd_core.h>
 #include <web_platform_interface.h>
+
 
 // DEFAULT macro conflict handling not needed now that SparkFun headers are
 // isolated behind an adapter
@@ -50,12 +51,12 @@ public:
   String getAllPDOProfiles();
 
   // Route handler methods
-  void mainPageHandler(WebRequest &req, WebResponse &res);
-  void pdStatusHandler(WebRequest &req, WebResponse &res);
-  void availableVoltagesHandler(WebRequest &req, WebResponse &res);
-  void availableCurrentsHandler(WebRequest &req, WebResponse &res);
-  void pdoProfilesHandler(WebRequest &req, WebResponse &res);
-  void setPDConfigHandler(WebRequest &req, WebResponse &res);
+  void mainPageHandler(WebRequestCore &req, WebResponseCore &res);
+  void pdStatusHandler(WebRequestCore &req, WebResponseCore &res);
+  void availableVoltagesHandler(WebRequestCore &req, WebResponseCore &res);
+  void availableCurrentsHandler(WebRequestCore &req, WebResponseCore &res);
+  void pdoProfilesHandler(WebRequestCore &req, WebResponseCore &res);
+  void setPDConfigHandler(WebRequestCore &req, WebResponseCore &res);
 
 private:
   IUsbPdChip &pdController;

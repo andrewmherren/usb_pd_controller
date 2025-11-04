@@ -1,14 +1,16 @@
 #include "usb_pd_controller.h"
 #include "../assets/usb_pd_html.h"
 #include "../assets/usb_pd_js.h"
+
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
 #include "chip/stusb4500_chip.h"
 
-// Create global instance of USBPDController
-// Default to real STUSB4500 adapter on ESP32; for native tests a test will
-// create its own instance with a fake chip, so this translation unit won't be
-// built there.
+// Create global instance of USBPDController with real STUSB4500 adapter
+// Only available on Arduino/ESP32 platforms; native tests create their own
+// instances
 static STUSB4500Chip g_stusb4500Adapter;
 USBPDController usbPDController(g_stusb4500Adapter);
+#endif
 
 // USBPDController implementation
 USBPDController::USBPDController(IUsbPdChip &chip)
@@ -31,8 +33,12 @@ void USBPDController::initializeHardware() {
   DEBUG_PRINTF("I2C pins: SDA=%d, SCL=%d\n", sdaPin, sclPin);
   DEBUG_PRINTF("Board type: %s\n", boardType.c_str());
 
-  // Initialize I2C with configured pins
+// Initialize I2C with configured pins
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
   Wire.begin(sdaPin, sclPin);
+#else
+  Wire.begin(); // ArduinoFake doesn't support 2-param version
+#endif
 
   // Check if PD board is connected
   pdBoardConnected = isPDBoardConnected();
@@ -86,14 +92,14 @@ void USBPDController::handle() {
 std::vector<RouteVariant> USBPDController::getHttpRoutes() {
   return {// Main page route - local access only for security
           WebRoute("/", WebModule::WM_GET,
-                   [this](WebRequest &req, WebResponse &res) {
+                   [this](WebRequestCore &req, WebResponseCore &res) {
                      mainPageHandler(req, res);
                    },
                    {AuthType::NONE}),
 
           // JavaScript assets - local access only
           WebRoute("/assets/usb-pd-controller.js", WebModule::WM_GET,
-                   [](WebRequest &req, WebResponse &res) {
+                   [](WebRequestCore &req, WebResponseCore &res) {
                      res.setProgmemContent(USB_PD_JS, "application/javascript");
                      res.setHeader("Cache-Control", "public, max-age=3600");
                    },
@@ -103,7 +109,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
           // for monitoring
           ApiRoute(
               "/api/status", WebModule::WM_GET,
-              [this](WebRequest &req, WebResponse &res) {
+              [this](WebRequestCore &req, WebResponseCore &res) {
                 pdStatusHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -114,7 +120,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/voltages", WebModule::WM_GET,
-              [this](WebRequest &req, WebResponse &res) {
+              [this](WebRequestCore &req, WebResponseCore &res) {
                 availableVoltagesHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -124,7 +130,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/currents", WebModule::WM_GET,
-              [this](WebRequest &req, WebResponse &res) {
+              [this](WebRequestCore &req, WebResponseCore &res) {
                 availableCurrentsHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -134,7 +140,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/profiles", WebModule::WM_GET,
-              [this](WebRequest &req, WebResponse &res) {
+              [this](WebRequestCore &req, WebResponseCore &res) {
                 pdoProfilesHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -145,7 +151,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/configure", WebModule::WM_POST,
-              [this](WebRequest &req, WebResponse &res) {
+              [this](WebRequestCore &req, WebResponseCore &res) {
                 setPDConfigHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN,
@@ -251,12 +257,14 @@ String USBPDController::getAllPDOProfiles() {
 }
 
 // Route handler implementations
-void USBPDController::mainPageHandler(WebRequest &req, WebResponse &res) {
+void USBPDController::mainPageHandler(WebRequestCore &req,
+                                      WebResponseCore &res) {
   // Use PROGMEM content for memory efficiency
   res.setProgmemContent(USB_PD_HTML, "text/html");
 }
 
-void USBPDController::pdStatusHandler(WebRequest &req, WebResponse &res) {
+void USBPDController::pdStatusHandler(WebRequestCore &req,
+                                      WebResponseCore &res) {
   IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
 #if defined(NATIVE_PLATFORM)
   (void)platform; // Avoid unused in native build where this TU isn't built
@@ -290,8 +298,8 @@ void USBPDController::pdStatusHandler(WebRequest &req, WebResponse &res) {
   });
 }
 
-void USBPDController::availableVoltagesHandler(WebRequest &req,
-                                               WebResponse &res) {
+void USBPDController::availableVoltagesHandler(WebRequestCore &req,
+                                               WebResponseCore &res) {
   IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
   platform.createJsonResponse(res, [&](JsonObject &json) {
     JsonArray voltages = json["voltages"].to<JsonArray>();
@@ -303,8 +311,8 @@ void USBPDController::availableVoltagesHandler(WebRequest &req,
   });
 }
 
-void USBPDController::availableCurrentsHandler(WebRequest &req,
-                                               WebResponse &res) {
+void USBPDController::availableCurrentsHandler(WebRequestCore &req,
+                                               WebResponseCore &res) {
   IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
   platform.createJsonResponse(res, [&](JsonObject &json) {
     JsonArray currents = json["currents"].to<JsonArray>();
@@ -320,7 +328,8 @@ void USBPDController::availableCurrentsHandler(WebRequest &req,
   });
 }
 
-void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
+void USBPDController::pdoProfilesHandler(WebRequestCore &req,
+                                         WebResponseCore &res) {
   if (!isPDBoardConnected()) {
     res.setStatus(503); // Service unavailable
     IWebPlatform &platform = IWebPlatformProvider::getPlatformInstance();
@@ -358,7 +367,8 @@ void USBPDController::pdoProfilesHandler(WebRequest &req, WebResponse &res) {
   });
 }
 
-void USBPDController::setPDConfigHandler(WebRequest &req, WebResponse &res) {
+void USBPDController::setPDConfigHandler(WebRequestCore &req,
+                                         WebResponseCore &res) {
   // Parse JSON from request body
   DynamicJsonDocument doc(256);
   DeserializationError error = deserializeJson(doc, req.getBody());
@@ -438,7 +448,7 @@ void USBPDController::parseConfig(const JsonVariant &config) {
 
   // Parse board type
   if (config.containsKey("board")) {
-    boardType = config["board"].as<String>();
+    boardType = config["board"].as<const char *>();
     DEBUG_PRINTF("USB PD Controller: Configured board type: %s\n",
                  boardType.c_str());
 

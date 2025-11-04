@@ -5,13 +5,6 @@
 #include <ArduinoFake.h>
 #include <usb_pd_core.h>
 
-
-// Pull in production core implementation for native build
-#ifndef USB_PD_CORE_IMPL_INCLUDED
-#define USB_PD_CORE_IMPL_INCLUDED
-#include "../../../src/usb_pd_core.cpp"
-#endif
-
 static void test_set_5v_uses_pdo1_only() {
   FakeUsbPdChip chip;
   USBPDCore core(chip);
