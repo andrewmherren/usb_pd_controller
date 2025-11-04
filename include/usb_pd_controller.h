@@ -58,6 +58,20 @@ public:
   void pdoProfilesHandler(WebRequestCore &req, WebResponseCore &res);
   void setPDConfigHandler(WebRequestCore &req, WebResponseCore &res);
 
+  // Lightweight accessors for testing and diagnostics
+  float getCurrentVoltage() const { return currentVoltage; }
+  float getCurrentCurrent() const { return currentCurrent; }
+  bool isPdBoardConnected() const { return pdBoardConnected; }
+  int getSdaPin() const { return sdaPin; }
+  int getSclPin() const { return sclPin; }
+  const String &getBoardType() const { return boardType; }
+  uint8_t getI2cAddress() const { return i2cAddress; }
+
+#if defined(NATIVE_PLATFORM)
+  // Test-only helper to apply configuration without initializing hardware
+  void __test_applyConfig(const JsonVariant &config) { parseConfig(config); }
+#endif
+
 private:
   IUsbPdChip &pdController;
   USBPDCore core;

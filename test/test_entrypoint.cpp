@@ -4,14 +4,21 @@
 // These are pure C++ tests with mocked Arduino APIs via ArduinoFake
 #ifdef NATIVE_PLATFORM
 #include <ArduinoFake.h>
-
-// Bring in the native test sources so PlatformIO sees the tests
-#include "native/src/test_usb_pd_core.cpp"
+#include <testing/testing_platform_provider.h>
+using namespace fakeit;
 
 // Forward declarations from included sources
 void register_usb_pd_core_tests();
+void register_usb_pd_controller_tests();
 
-extern "C" void setUp(void) { ArduinoFakeReset(); }
+extern "C" void setUp(void) {
+  ArduinoFakeReset();
+  // Provide a mock platform instance for handlers using IWebPlatformProvider
+  static MockWebPlatformProvider provider;
+  IWebPlatformProvider::instance = &provider;
+  // Stub delay to avoid timing side-effects in native tests
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+}
 
 extern "C" void tearDown(void) {
   // Clean teardown - nothing needed currently
@@ -22,6 +29,7 @@ int main(int argc, char **argv) {
 
   // Register and run native tests
   register_usb_pd_core_tests();
+  register_usb_pd_controller_tests();
 
   UNITY_END();
   return 0;
