@@ -124,6 +124,44 @@ static void test_parseConfig_updates_fields_via_test_helper() {
   TEST_ASSERT_EQUAL_UINT8(0x29, ctrl.getI2cAddress());
 }
 
+static void test_mainPageHandler_sets_progmem() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.mainPageHandler(req, res);
+  TEST_ASSERT_TRUE(res.hasProgmemContent());
+  TEST_ASSERT_EQUAL_STRING("text/html", res.getMimeType().c_str());
+}
+
+static void test_availableVoltagesHandler_lists_values() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.availableVoltagesHandler(req, res);
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE_MESSAGE(err, "Voltages JSON parse error");
+  TEST_ASSERT_TRUE(doc.containsKey("voltages"));
+  JsonArray arr = doc["voltages"].as<JsonArray>();
+  TEST_ASSERT_EQUAL(5, arr.size());
+}
+
+static void test_availableCurrentsHandler_lists_values() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.availableCurrentsHandler(req, res);
+  StaticJsonDocument<512> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE_MESSAGE(err, "Currents JSON parse error");
+  TEST_ASSERT_TRUE(doc.containsKey("currents"));
+  JsonArray arr = doc["currents"].as<JsonArray>();
+  TEST_ASSERT_TRUE(arr.size() >= 9);
+}
+
 void register_usb_pd_controller_tests() {
   RUN_TEST(test_module_metadata);
   RUN_TEST(test_isPDBoardConnected_reflects_probe);
@@ -135,6 +173,9 @@ void register_usb_pd_controller_tests() {
   RUN_TEST(test_routes_built_and_sizes);
   RUN_TEST(test_pdStatusHandler_builds_json);
   RUN_TEST(test_parseConfig_updates_fields_via_test_helper);
+  RUN_TEST(test_mainPageHandler_sets_progmem);
+  RUN_TEST(test_availableVoltagesHandler_lists_values);
+  RUN_TEST(test_availableCurrentsHandler_lists_values);
 }
 
 #endif // NATIVE_PLATFORM

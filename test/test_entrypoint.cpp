@@ -9,7 +9,9 @@ using namespace fakeit;
 
 // Forward declarations from included sources
 void register_usb_pd_core_tests();
+void register_usb_pd_core_negative_tests();
 void register_usb_pd_controller_tests();
+void register_usb_pd_controller_init_and_routes_tests();
 
 extern "C" void setUp(void) {
   ArduinoFakeReset();
@@ -18,6 +20,8 @@ extern "C" void setUp(void) {
   IWebPlatformProvider::instance = &provider;
   // Stub delay to avoid timing side-effects in native tests
   When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  // Stub millis for timing-related tests
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0UL);
 }
 
 extern "C" void tearDown(void) {
@@ -29,7 +33,9 @@ int main(int argc, char **argv) {
 
   // Register and run native tests
   register_usb_pd_core_tests();
+  register_usb_pd_core_negative_tests();
   register_usb_pd_controller_tests();
+  register_usb_pd_controller_init_and_routes_tests();
 
   UNITY_END();
   return 0;
