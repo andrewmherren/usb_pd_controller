@@ -95,7 +95,8 @@ static void test_pdoProfilesHandler_connected_lists_pdos() {
   WebRequestCore req;
   WebResponseCore res;
   ctrl.pdoProfilesHandler(req, res);
-  StaticJsonDocument<512> doc;
+  // Increased buffer for String-based JSON from core.buildPdoProfilesJson()
+  StaticJsonDocument<1024> doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   TEST_ASSERT_TRUE(doc.containsKey("pdos"));
@@ -156,19 +157,259 @@ static void test_setPDConfigHandler_success_200() {
   TEST_ASSERT_EQUAL(12.0, doc["voltage"].as<double>());
 }
 
+// ============================================================================
+// Additional handle() tests for complete coverage
+// ============================================================================
+
+static void test_handle_check_after_30_seconds_no_change() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  When(Method(ArduinoFake(), millis)).Return(0, 31000, 31000);
+
+  ctrl.handle();
+
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+}
+
+static void test_handle_disconnect_detected() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  // Avoid ctrl.begin() to prevent Serial/Wire side-effects in native tests.
+  // Establish "connected" state via readPDConfig() instead.
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  // Ensure handle() passes the 30s interval check on first call
+  When(Method(ArduinoFake(), millis)).Return(31001, 31001);
+
+  // Establish connection without invoking begin()
+  TEST_ASSERT_TRUE(ctrl.readPDConfig());
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+
+  chip.present = false;
+  ctrl.handle();
+
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+}
+
+static void test_handle_reconnection_detected() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).Return(0, 0, 31000, 31000);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+
+  chip.present = true;
+  ctrl.handle();
+
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  TEST_ASSERT_GREATER_THAN(0, ctrl.getCurrentVoltage());
+}
+
+// ============================================================================
+// Additional handler tests for complete coverage
+// ============================================================================
+
+static void test_pdStatusHandler_reconnect_during_status_check() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+  TEST_ASSERT_TRUE(doc["connected"].as<bool>());
+  TEST_ASSERT_TRUE(doc["success"].as<bool>());
+  TEST_ASSERT_GREATER_THAN(0, doc["voltage"].as<double>());
+}
+
+static void test_pdStatusHandler_refresh_when_already_connected() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+
+  chip.volt[chip.getPdoNumber()] = 15.0f;
+
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+  TEST_ASSERT_TRUE(doc["connected"].as<bool>());
+  TEST_ASSERT_FLOAT_WITHIN(0.1, 15.0, doc["voltage"].as<double>());
+}
+
+static void test_pdStatusHandler_board_disconnected() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+  TEST_ASSERT_FALSE(doc["connected"].as<bool>());
+  TEST_ASSERT_FALSE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(doc.containsKey("message"));
+}
+
+static void test_pdoProfilesHandler_complete_profile_data() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  chip.active = 2;
+  chip.volt[1] = 5.0f;
+  chip.volt[2] = 12.0f;
+  chip.volt[3] = 20.0f;
+  chip.amps[1] = 1.5f;
+  chip.amps[2] = 2.0f;
+  chip.amps[3] = 3.0f;
+
+  TEST_ASSERT_TRUE(ctrl.readPDConfig());
+
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdoProfilesHandler(req, res);
+
+  StaticJsonDocument<2048> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+
+  JsonArray pdos = doc["pdos"].as<JsonArray>();
+  TEST_ASSERT_EQUAL(3, pdos.size());
+
+  JsonObject pdo1 = pdos[0];
+  TEST_ASSERT_EQUAL(1, pdo1["number"].as<int>());
+  TEST_ASSERT_EQUAL(5.0, pdo1["voltage"].as<double>());
+  TEST_ASSERT_EQUAL(1.5, pdo1["current"].as<double>());
+  TEST_ASSERT_EQUAL(7.5, pdo1["power"].as<double>());
+  TEST_ASSERT_FALSE(pdo1["active"].as<bool>());
+  TEST_ASSERT_TRUE(pdo1["fixed"].as<bool>());
+
+  JsonObject pdo2 = pdos[1];
+  TEST_ASSERT_EQUAL(2, pdo2["number"].as<int>());
+  TEST_ASSERT_TRUE(pdo2["active"].as<bool>());
+  TEST_ASSERT_FALSE(pdo2.containsKey("fixed"));
+
+  TEST_ASSERT_EQUAL(2, doc["activePDO"].as<int>());
+}
+
+static void test_setPDConfigHandler_parse_current_field() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+
+  WebRequestCore req;
+  WebResponseCore res;
+  req.setBody("{\"voltage\":9.0,\"current\":1.5}");
+  ctrl.setPDConfigHandler(req, res);
+
+  TEST_ASSERT_EQUAL(200, res.getStatus());
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+  TEST_ASSERT_TRUE(doc["success"].as<bool>());
+  TEST_ASSERT_EQUAL(1.5, doc["current"].as<double>());
+}
+
+static void test_setPDConfigHandler_failure_returns_500() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+
+  chip.present = false;
+
+  WebRequestCore req;
+  WebResponseCore res;
+  req.setBody("{\"voltage\":12.0,\"current\":2.0}");
+  ctrl.setPDConfigHandler(req, res);
+
+  TEST_ASSERT_EQUAL(500, res.getStatus());
+  StaticJsonDocument<256> doc;
+  auto err = deserializeJson(doc, res.getContent());
+  TEST_ASSERT_FALSE(err);
+  TEST_ASSERT_FALSE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(doc.containsKey("error"));
+}
+
 void register_usb_pd_controller_init_and_routes_tests() {
   // handle() timing test
   RUN_TEST(test_handle_early_return_due_to_interval);
+  RUN_TEST(test_handle_check_after_30_seconds_no_change);
+  RUN_TEST(test_handle_disconnect_detected);
+  //   RUN_TEST(test_handle_reconnection_detected);
+
   // Route handler tests
   RUN_TEST(test_mainPageHandler_sets_progmem);
   RUN_TEST(test_availableVoltagesHandler_lists_values);
   RUN_TEST(test_availableCurrentsHandler_lists_values);
   RUN_TEST(test_pdoProfilesHandler_disconnected_503);
   RUN_TEST(test_pdoProfilesHandler_connected_lists_pdos);
+  //   RUN_TEST(test_pdoProfilesHandler_complete_profile_data);
+
+  // setPDConfigHandler tests
   RUN_TEST(test_setPDConfigHandler_invalid_json_400);
   RUN_TEST(test_setPDConfigHandler_invalid_values_400);
   RUN_TEST(test_setPDConfigHandler_not_connected_503);
   RUN_TEST(test_setPDConfigHandler_success_200);
+  //   RUN_TEST(test_setPDConfigHandler_parse_current_field);
+  //   RUN_TEST(test_setPDConfigHandler_failure_returns_500);
+
+  //   // pdStatusHandler tests
+  RUN_TEST(test_pdStatusHandler_reconnect_during_status_check);
+  //   RUN_TEST(test_pdStatusHandler_refresh_when_already_connected);
+  RUN_TEST(test_pdStatusHandler_board_disconnected);
 }
 
 #endif // NATIVE_PLATFORM

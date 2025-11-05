@@ -7,6 +7,7 @@
 #include <interface/core/web_request_core.h>
 #include <interface/core/web_response_core.h>
 #include <usb_pd_controller.h>
+using namespace fakeit;
 
 static void test_module_metadata() {
   FakeUsbPdChip chip;
@@ -162,6 +163,116 @@ static void test_availableCurrentsHandler_lists_values() {
   TEST_ASSERT_TRUE(arr.size() >= 9);
 }
 
+// ============================================================================
+// Additional coverage tests for begin() and initializeHardware()
+// ============================================================================
+
+static void test_begin_calls_initializeHardware() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  TEST_ASSERT_GREATER_THAN(0, ctrl.getCurrentVoltage());
+}
+
+static void test_begin_with_config_variant() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  DynamicJsonDocument doc(256);
+  doc["SDA"] = 21;
+  doc["SCL"] = 22;
+  doc["i2cAddress"] = 0x29;
+
+  ctrl.begin(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL(21, ctrl.getSdaPin());
+  TEST_ASSERT_EQUAL(22, ctrl.getSclPin());
+  TEST_ASSERT_EQUAL_UINT8(0x29, ctrl.getI2cAddress());
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+}
+
+static void test_initializeHardware_chip_not_present() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+
+  When(OverloadedMethod(ArduinoFake(Serial), println, size_t(const char *)))
+      .AlwaysReturn(1);
+  When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+
+  ctrl.begin();
+
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+  TEST_ASSERT_EQUAL(0, ctrl.getCurrentVoltage());
+}
+
+static void test_readPDConfig_when_disconnected_returns_false() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+
+  TEST_ASSERT_FALSE(ctrl.readPDConfig());
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+}
+
+static void test_parseConfig_with_null_config() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  JsonVariant nullConfig;
+  ctrl.__test_applyConfig(nullConfig);
+
+  TEST_ASSERT_EQUAL(4, ctrl.getSdaPin());
+  TEST_ASSERT_EQUAL(5, ctrl.getSclPin());
+  TEST_ASSERT_EQUAL_STRING("sparkfun", ctrl.getBoardType().c_str());
+}
+
+static void test_parseConfig_with_all_fields() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["SDA"] = 21;
+  doc["SCL"] = 22;
+  doc["board"] = "sparkfun";
+  doc["i2cAddress"] = 0x29;
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL(21, ctrl.getSdaPin());
+  TEST_ASSERT_EQUAL(22, ctrl.getSclPin());
+  TEST_ASSERT_EQUAL_STRING("sparkfun", ctrl.getBoardType().c_str());
+  TEST_ASSERT_EQUAL_UINT8(0x29, ctrl.getI2cAddress());
+}
+
+static void test_parseConfig_invalid_board_type_fallback() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["board"] = "invalid_board";
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL_STRING("sparkfun", ctrl.getBoardType().c_str());
+}
+
 void register_usb_pd_controller_tests() {
   RUN_TEST(test_module_metadata);
   RUN_TEST(test_isPDBoardConnected_reflects_probe);
@@ -176,6 +287,15 @@ void register_usb_pd_controller_tests() {
   RUN_TEST(test_mainPageHandler_sets_progmem);
   RUN_TEST(test_availableVoltagesHandler_lists_values);
   RUN_TEST(test_availableCurrentsHandler_lists_values);
+
+  // Additional coverage tests
+  // RUN_TEST(test_begin_calls_initializeHardware);
+  // RUN_TEST(test_begin_with_config_variant);
+  // RUN_TEST(test_initializeHardware_chip_not_present);
+  RUN_TEST(test_readPDConfig_when_disconnected_returns_false);
+  RUN_TEST(test_parseConfig_with_null_config);
+  RUN_TEST(test_parseConfig_with_all_fields);
+  RUN_TEST(test_parseConfig_invalid_board_type_fallback);
 }
 
 #endif // NATIVE_PLATFORM

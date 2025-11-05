@@ -13,11 +13,17 @@ void register_usb_pd_core_negative_tests();
 void register_usb_pd_controller_tests();
 void register_usb_pd_controller_init_and_routes_tests();
 
+// Global provider that persists across tests (but gets reset in setUp)
+static MockWebPlatformProvider *globalProvider = nullptr;
+
 extern "C" void setUp(void) {
   ArduinoFakeReset();
-  // Provide a mock platform instance for handlers using IWebPlatformProvider
-  static MockWebPlatformProvider provider;
-  IWebPlatformProvider::instance = &provider;
+  // Create a fresh mock platform instance for each test
+  if (globalProvider) {
+    delete globalProvider;
+  }
+  globalProvider = new MockWebPlatformProvider();
+  IWebPlatformProvider::instance = globalProvider;
   // Stub delay to avoid timing side-effects in native tests
   When(Method(ArduinoFake(), delay)).AlwaysReturn();
   // Stub millis for timing-related tests
@@ -25,7 +31,9 @@ extern "C" void setUp(void) {
 }
 
 extern "C" void tearDown(void) {
-  // Clean teardown - nothing needed currently
+  // Reset platform instance to avoid static destructor order issues
+  IWebPlatformProvider::instance = nullptr;
+  // Don't delete here - will be deleted in next setUp or at program end
 }
 
 int main(int argc, char **argv) {
@@ -38,6 +46,13 @@ int main(int argc, char **argv) {
   register_usb_pd_controller_init_and_routes_tests();
 
   UNITY_END();
+
+  // Clean up global provider
+  if (globalProvider) {
+    delete globalProvider;
+    globalProvider = nullptr;
+  }
+
   return 0;
 }
 

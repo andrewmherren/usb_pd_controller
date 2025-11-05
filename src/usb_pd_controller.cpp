@@ -332,29 +332,10 @@ void USBPDController::pdoProfilesHandler(WebRequestCore &req,
     return;
   }
 
-  respondJson(res, [&](JsonObject &json) {
-    JsonArray pdos = json["pdos"].to<JsonArray>();
-
-    for (int i = 1; i <= 3; i++) {
-      int index = pdos.size();
-      pdos.add(JsonObject());
-      JsonObject pdo = pdos[index];
-      float voltage = pdController.getVoltage(i);
-      float current = pdController.getCurrent(i);
-      bool isActive = (pdController.getPdoNumber() == i);
-
-      pdo["number"] = i;
-      pdo["voltage"] = voltage;
-      pdo["current"] = current;
-      pdo["power"] = voltage * current;
-      pdo["active"] = isActive;
-      if (i == 1) {
-        pdo["fixed"] = true; // PDO1 is always fixed at 5V
-      }
-    }
-
-    json["activePDO"] = pdController.getPdoNumber();
-  });
+  // Use the core's string-based JSON builder (which works) instead of
+  // ArduinoJson (which has mysterious truncation issues in native tests)
+  String jsonStr = core.buildPdoProfilesJson();
+  res.setContent(jsonStr.c_str(), "application/json");
 }
 
 void USBPDController::setPDConfigHandler(WebRequestCore &req,
