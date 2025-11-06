@@ -11,7 +11,7 @@ using namespace fakeit;
 void register_usb_pd_core_tests();
 void register_usb_pd_core_negative_tests();
 void register_usb_pd_controller_tests();
-void register_usb_pd_controller_init_and_routes_tests();
+void register_usb_pd_controller_routes_tests();
 
 // Global provider that persists across tests (but gets reset in setUp)
 static MockWebPlatformProvider *globalProvider = nullptr;
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   register_usb_pd_core_tests();
   register_usb_pd_core_negative_tests();
   register_usb_pd_controller_tests();
-  register_usb_pd_controller_init_and_routes_tests();
+  register_usb_pd_controller_routes_tests();
 
   UNITY_END();
 
