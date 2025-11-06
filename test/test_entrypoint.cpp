@@ -62,17 +62,19 @@ int main(int argc, char **argv) {
 #else
 #include <Arduino.h>
 
-// Minimal ESP32 test to verify the library compiles on hardware
-// The interface library doesn't need extensive ESP32-specific tests since
-// it's primarily type definitions and pure C++ interfaces
+// ESP32 test entrypoint: runs on-device tests located under test/esp32 (recursive)
+// Each on-device test file should expose a registrar function that runs its
+// own RUN_TEST calls. We invoke those here.
 
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
 
-void test_interface_library_compiles_on_esp32(void) {
-  // Simple test to verify library compiles and links on ESP32
-  TEST_ASSERT_TRUE(true);
-}
+// Optional: still allow a minimal sanity test
+static void test_esp32_sanity_compiles_and_runs() { TEST_ASSERT_TRUE(true); }
+
+// Forward declarations for on-device tests (defined under test/esp32)
+void test_esp32_begin_initializeHardware_does_not_crash();
+void test_esp32_handle_interval_no_crash();
 
 void setup() {
   // Allow USB CDC/Serial to enumerate
@@ -82,6 +84,12 @@ void setup() {
     delay(10);
   }
   UNITY_BEGIN();
+  // Give the serial monitor a moment to attach before printing results
+  delay(500);
+
+  RUN_TEST(test_esp32_sanity_compiles_and_runs);
+  RUN_TEST(test_esp32_begin_initializeHardware_does_not_crash);
+  RUN_TEST(test_esp32_handle_interval_no_crash);
 
   UNITY_END();
 }

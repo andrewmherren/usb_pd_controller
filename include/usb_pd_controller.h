@@ -50,13 +50,22 @@ public:
   // Get all PDO profiles as JSON string
   String getAllPDOProfiles();
 
-  // Route handler methods
-  void mainPageHandler(WebRequestCore &req, WebResponseCore &res);
-  void pdStatusHandler(WebRequestCore &req, WebResponseCore &res);
-  void availableVoltagesHandler(WebRequestCore &req, WebResponseCore &res);
-  void availableCurrentsHandler(WebRequestCore &req, WebResponseCore &res);
-  void pdoProfilesHandler(WebRequestCore &req, WebResponseCore &res);
-  void setPDConfigHandler(WebRequestCore &req, WebResponseCore &res);
+  // Platform-specific request/response typedefs for unified handlers
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
+  using RequestT = WebRequest;
+  using ResponseT = WebResponse;
+#else
+  using RequestT = WebRequestCore;
+  using ResponseT = WebResponseCore;
+#endif
+
+  // Route handler methods (unified signatures)
+  void mainPageHandler(RequestT &req, ResponseT &res);
+  void pdStatusHandler(RequestT &req, ResponseT &res);
+  void availableVoltagesHandler(RequestT &req, ResponseT &res);
+  void availableCurrentsHandler(RequestT &req, ResponseT &res);
+  void pdoProfilesHandler(RequestT &req, ResponseT &res);
+  void setPDConfigHandler(RequestT &req, ResponseT &res);
 
   // Lightweight accessors for testing and diagnostics
   float getCurrentVoltage() const { return currentVoltage; }
@@ -94,7 +103,7 @@ private:
 
   // Helper to reduce platform lookup duplication when creating JSON responses
   template <typename Fn>
-  inline void respondJson(WebResponseCore &res, Fn &&fn) {
+  inline void respondJson(ResponseT &res, Fn &&fn) {
     IWebPlatformProvider::getPlatformInstance().createJsonResponse(
         res, std::forward<Fn>(fn));
   }

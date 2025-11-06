@@ -2,6 +2,11 @@
 #include "../assets/usb_pd_html.h"
 #include "../assets/usb_pd_js.h"
 
+// Allow tests to override the periodic handle interval (default 30s)
+#ifndef USB_PD_HANDLE_INTERVAL_MS
+#define USB_PD_HANDLE_INTERVAL_MS 30000UL
+#endif
+
 #if defined(ARDUINO) || defined(ESP_PLATFORM)
 #include "chip/stusb4500_chip.h"
 
@@ -63,7 +68,7 @@ void USBPDController::initializeHardware() {
 void USBPDController::handle() {
   // Check if it's time to check PD board status (every 30 seconds to reduce I2C
   // spam)
-  if (millis() - lastCheckTime <= 30000) {
+  if (millis() - lastCheckTime <= USB_PD_HANDLE_INTERVAL_MS) {
     return;
   }
 
@@ -93,14 +98,14 @@ void USBPDController::handle() {
 std::vector<RouteVariant> USBPDController::getHttpRoutes() {
   return {// Main page route - local access only for security
           WebRoute("/", WebModule::WM_GET,
-                   [this](WebRequestCore &req, WebResponseCore &res) {
+                   [this](RequestT &req, ResponseT &res) {
                      mainPageHandler(req, res);
                    },
                    {AuthType::NONE}),
 
           // JavaScript assets - local access only
           WebRoute("/assets/usb-pd-controller.js", WebModule::WM_GET,
-                   [](WebRequestCore &req, WebResponseCore &res) {
+                   [](RequestT &req, ResponseT &res) {
                      res.setProgmemContent(USB_PD_JS, "application/javascript");
                      res.setHeader("Cache-Control", "public, max-age=3600");
                    },
@@ -110,7 +115,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
           // for monitoring
           ApiRoute(
               "/api/status", WebModule::WM_GET,
-              [this](WebRequestCore &req, WebResponseCore &res) {
+              [this](RequestT &req, ResponseT &res) {
                 pdStatusHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -121,7 +126,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/voltages", WebModule::WM_GET,
-              [this](WebRequestCore &req, WebResponseCore &res) {
+              [this](RequestT &req, ResponseT &res) {
                 availableVoltagesHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -131,7 +136,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/currents", WebModule::WM_GET,
-              [this](WebRequestCore &req, WebResponseCore &res) {
+              [this](RequestT &req, ResponseT &res) {
                 availableCurrentsHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -141,7 +146,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/profiles", WebModule::WM_GET,
-              [this](WebRequestCore &req, WebResponseCore &res) {
+              [this](RequestT &req, ResponseT &res) {
                 pdoProfilesHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN, AuthType::TOKEN},
@@ -152,7 +157,7 @@ std::vector<RouteVariant> USBPDController::getHttpRoutes() {
 
           ApiRoute(
               "/api/configure", WebModule::WM_POST,
-              [this](WebRequestCore &req, WebResponseCore &res) {
+              [this](RequestT &req, ResponseT &res) {
                 setPDConfigHandler(req, res);
               },
               {AuthType::SESSION, AuthType::PAGE_TOKEN,
@@ -256,14 +261,14 @@ String USBPDController::getAllPDOProfiles() {
 }
 
 // Route handler implementations
-void USBPDController::mainPageHandler(WebRequestCore &req,
-                                      WebResponseCore &res) {
+void USBPDController::mainPageHandler(RequestT &req,
+                                      ResponseT &res) {
   // Use PROGMEM content for memory efficiency
   res.setProgmemContent(USB_PD_HTML, "text/html");
 }
 
-void USBPDController::pdStatusHandler(WebRequestCore &req,
-                                      WebResponseCore &res) {
+void USBPDController::pdStatusHandler(RequestT &req,
+                                      ResponseT &res) {
   respondJson(res, [&](JsonObject &json) {
     // Check if PD board is connected
     bool connected = isPDBoardConnected();
@@ -293,8 +298,8 @@ void USBPDController::pdStatusHandler(WebRequestCore &req,
   });
 }
 
-void USBPDController::availableVoltagesHandler(WebRequestCore &req,
-                                               WebResponseCore &res) {
+void USBPDController::availableVoltagesHandler(RequestT &req,
+                                               ResponseT &res) {
   respondJson(res, [&](JsonObject &json) {
     JsonArray voltages = json["voltages"].to<JsonArray>();
     voltages.add(5.0);
@@ -305,8 +310,8 @@ void USBPDController::availableVoltagesHandler(WebRequestCore &req,
   });
 }
 
-void USBPDController::availableCurrentsHandler(WebRequestCore &req,
-                                               WebResponseCore &res) {
+void USBPDController::availableCurrentsHandler(RequestT &req,
+                                               ResponseT &res) {
   respondJson(res, [&](JsonObject &json) {
     JsonArray currents = json["currents"].to<JsonArray>();
     currents.add(0.5);
@@ -321,8 +326,8 @@ void USBPDController::availableCurrentsHandler(WebRequestCore &req,
   });
 }
 
-void USBPDController::pdoProfilesHandler(WebRequestCore &req,
-                                         WebResponseCore &res) {
+void USBPDController::pdoProfilesHandler(RequestT &req,
+                                         ResponseT &res) {
   if (!isPDBoardConnected()) {
     res.setStatus(503); // Service unavailable
     respondJson(res, [&](JsonObject &json) {
@@ -358,8 +363,8 @@ void USBPDController::pdoProfilesHandler(WebRequestCore &req,
     json["activePDO"] = pdController.getPdoNumber();
   });
 }
-void USBPDController::setPDConfigHandler(WebRequestCore &req,
-                                         WebResponseCore &res) {
+void USBPDController::setPDConfigHandler(RequestT &req,
+                                         ResponseT &res) {
   // Parse JSON from request body
   DynamicJsonDocument doc(256);
   DeserializationError error = deserializeJson(doc, req.getBody());
