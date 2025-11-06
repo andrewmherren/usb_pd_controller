@@ -17,7 +17,8 @@ USBPDController::USBPDController(IUsbPdChip &chip)
     : pdController(chip), core(pdController) {}
 
 void USBPDController::begin() {
-  Serial.println("USB PD Controller module initialized");
+  // Use debug macro to avoid direct Serial dependency in native tests
+  DEBUG_PRINTLN("USB PD Controller module initialized");
   initializeHardware();
 }
 
@@ -332,12 +333,31 @@ void USBPDController::pdoProfilesHandler(WebRequestCore &req,
     return;
   }
 
-  // Use the core's string-based JSON builder (which works) instead of
-  // ArduinoJson (which has mysterious truncation issues in native tests)
-  String jsonStr = core.buildPdoProfilesJson();
-  res.setContent(jsonStr.c_str(), "application/json");
-}
+  // Return all PDO profiles with active PDO indicator
+  respondJson(res, [&](JsonObject &json) {
+    JsonArray pdos = json.createNestedArray("pdos");
 
+    // Build PDO profiles directly from chip data
+    for (int i = 1; i <= 3; ++i) {
+      JsonObject pdo = pdos.createNestedObject();
+      float v = pdController.getVoltage(i);
+      float c = pdController.getCurrent(i);
+      bool active = (pdController.getPdoNumber() == i);
+
+      pdo["number"] = i;
+      pdo["voltage"] = v;
+      pdo["current"] = c;
+      pdo["power"] = v * c;
+      pdo["active"] = active;
+
+      if (i == 1) {
+        pdo["fixed"] = true;
+      }
+    }
+
+    json["activePDO"] = pdController.getPdoNumber();
+  });
+}
 void USBPDController::setPDConfigHandler(WebRequestCore &req,
                                          WebResponseCore &res) {
   // Parse JSON from request body

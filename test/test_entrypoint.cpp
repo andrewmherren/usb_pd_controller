@@ -24,6 +24,8 @@ extern "C" void setUp(void) {
   }
   globalProvider = new MockWebPlatformProvider();
   IWebPlatformProvider::instance = globalProvider;
+  // Stub Wire.begin to avoid any side effects in native tests
+  When(OverloadedMethod(ArduinoFake(Wire), begin, void())).AlwaysDo([]() {});
   // Stub delay to avoid timing side-effects in native tests
   When(Method(ArduinoFake(), delay)).AlwaysReturn();
   // Stub millis for timing-related tests

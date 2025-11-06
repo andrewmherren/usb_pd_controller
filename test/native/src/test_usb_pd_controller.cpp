@@ -289,9 +289,9 @@ void register_usb_pd_controller_tests() {
   RUN_TEST(test_availableCurrentsHandler_lists_values);
 
   // Additional coverage tests
-  // RUN_TEST(test_begin_calls_initializeHardware);
-  // RUN_TEST(test_begin_with_config_variant);
-  // RUN_TEST(test_initializeHardware_chip_not_present);
+  RUN_TEST(test_begin_calls_initializeHardware);
+  RUN_TEST(test_begin_with_config_variant);
+  RUN_TEST(test_initializeHardware_chip_not_present);
   RUN_TEST(test_readPDConfig_when_disconnected_returns_false);
   RUN_TEST(test_parseConfig_with_null_config);
   RUN_TEST(test_parseConfig_with_all_fields);

@@ -4,13 +4,15 @@
 #include <array>
 #include <usb_pd_chip.h>
 
-
 class FakeUsbPdChip : public IUsbPdChip {
 public:
   bool present = true;
   int active = 1;
   std::array<float, 4> volt{{0, 5.0f, 12.0f, 20.0f}};
   std::array<float, 4> amps{{0, 1.0f, 2.0f, 3.0f}};
+
+  // Simulate write failure - when true, write() corrupts values to 0
+  bool simulateWriteFailure = false;
 
   bool probe(uint8_t) override { return present; }
   bool begin() override { return present; }
@@ -21,7 +23,18 @@ public:
   void setVoltage(int idx, float v) override { volt[idx] = v; }
   void setCurrent(int idx, float a) override { amps[idx] = a; }
   void setPdoNumber(int idx) override { active = idx; }
-  void write() override {}
+  void write() override {
+    // Simulate a chip that doesn't properly accept the write
+    if (simulateWriteFailure) {
+      // Corrupt the values to simulate write failure
+      volt[1] = 0.0f;
+      volt[2] = 0.0f;
+      volt[3] = 0.0f;
+      amps[1] = 0.0f;
+      amps[2] = 0.0f;
+      amps[3] = 0.0f;
+    }
+  }
   void softReset() override {}
 };
 
