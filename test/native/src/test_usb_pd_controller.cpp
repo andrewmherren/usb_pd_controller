@@ -47,6 +47,22 @@ static void test_readPDConfig_success_updates_cache() {
                            ctrl.getCurrentCurrent());
 }
 
+static void test_readPDConfig_core_read_failure() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+  
+  // Connect the board
+  TEST_ASSERT_TRUE(ctrl.readPDConfig());
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  
+  // Corrupt chip state to make core.readConfig fail
+  chip.volt[chip.getPdoNumber()] = 0.0f;
+  
+  // This should return false on read failure
+  TEST_ASSERT_FALSE(ctrl.readPDConfig());
+}
+
 static void test_setPDConfig_requires_connection() {
   FakeUsbPdChip chip;
   chip.present = true;
@@ -278,6 +294,7 @@ void register_usb_pd_controller_tests() {
   RUN_TEST(test_isPDBoardConnected_reflects_probe);
   RUN_TEST(test_readPDConfig_reconnect_failure_returns_false);
   RUN_TEST(test_readPDConfig_success_updates_cache);
+  RUN_TEST(test_readPDConfig_core_read_failure);
   RUN_TEST(test_setPDConfig_requires_connection);
   RUN_TEST(test_setPDConfig_success_updates_cache);
   RUN_TEST(test_getAllPDOProfiles_behaviour);

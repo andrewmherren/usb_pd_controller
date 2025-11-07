@@ -116,6 +116,57 @@ static void test_pdoProfilesHandler_disconnected_503() {
   TEST_ASSERT_TRUE(doc["pdos"].is<JsonArray>());
 }
 
+static void test_pdStatusHandler_json_fields_when_connected() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  chip.volt[1] = 9.0f;
+  chip.amps[1] = 1.5f;
+  USBPDController ctrl(chip);
+  
+  TEST_ASSERT_TRUE(ctrl.readPDConfig());
+  
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+  
+  StaticJsonDocument<512> doc;
+  deserializeJson(doc, res.getContent());
+  
+  // Verify all expected JSON fields are present
+  TEST_ASSERT_TRUE(doc.containsKey("success"));
+  TEST_ASSERT_TRUE(doc.containsKey("connected"));
+  TEST_ASSERT_TRUE(doc.containsKey("voltage"));
+  TEST_ASSERT_TRUE(doc.containsKey("current"));
+  TEST_ASSERT_TRUE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(doc["connected"].as<bool>());
+  TEST_ASSERT_EQUAL(9.0, doc["voltage"].as<double>());
+  TEST_ASSERT_EQUAL(1.5, doc["current"].as<double>());
+}
+
+static void test_pdStatusHandler_reconnection_path() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+  
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  
+  // Initially not connected
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+  
+  // Call pdStatusHandler which should trigger reconnection
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+  
+  StaticJsonDocument<256> doc;
+  deserializeJson(doc, res.getContent());
+  
+  // Should have connected and read config
+  TEST_ASSERT_TRUE(doc["connected"].as<bool>());
+  TEST_ASSERT_TRUE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+}
+
 static void test_pdoProfilesHandler_connected_lists_pdos() {
   FakeUsbPdChip chip;
   chip.present = true;
@@ -264,6 +315,8 @@ void register_usb_pd_controller_routes_tests() {
   RUN_TEST(test_availableVoltagesHandler_lists_values);
   RUN_TEST(test_availableCurrentsHandler_lists_values);
   RUN_TEST(test_pdoProfilesHandler_disconnected_503);
+  RUN_TEST(test_pdStatusHandler_json_fields_when_connected);
+  RUN_TEST(test_pdStatusHandler_reconnection_path);
   RUN_TEST(test_pdoProfilesHandler_connected_lists_pdos);
   RUN_TEST(test_pdoProfilesHandler_complete_profile_data);
   // setPDConfig
