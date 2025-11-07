@@ -63,6 +63,22 @@ static void test_readPDConfig_core_read_failure() {
   TEST_ASSERT_FALSE(ctrl.readPDConfig());
 }
 
+static void test_readPDConfig_reconnects_when_disconnected() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+  
+  // Initially not connected
+  TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
+  
+  // readPDConfig should trigger reconnection (line 218)
+  bool result = ctrl.readPDConfig();
+  
+  TEST_ASSERT_TRUE(result);
+  TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  TEST_ASSERT_GREATER_THAN(0, ctrl.getCurrentVoltage());
+}
+
 static void test_setPDConfig_requires_connection() {
   FakeUsbPdChip chip;
   chip.present = true;
@@ -80,6 +96,20 @@ static void test_setPDConfig_success_updates_cache() {
   TEST_ASSERT_TRUE(ctrl.setPDConfig(12.0f, 2.0f));
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 12.0f, ctrl.getCurrentVoltage());
   TEST_ASSERT_FLOAT_WITHIN(0.001f, 2.0f, ctrl.getCurrentCurrent());
+}
+
+static void test_setPDConfig_calls_delay_on_success() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  USBPDController ctrl(chip);
+  
+  When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  
+  TEST_ASSERT_TRUE(ctrl.readPDConfig());
+  TEST_ASSERT_TRUE(ctrl.setPDConfig(9.0f, 1.5f));
+  
+  // Verify delay was called (line 227)
+  Verify(Method(ArduinoFake(), delay).Using(100)).Once();
 }
 
 static void test_getAllPDOProfiles_behaviour() {
@@ -289,14 +319,66 @@ static void test_parseConfig_invalid_board_type_fallback() {
   TEST_ASSERT_EQUAL_STRING("sparkfun", ctrl.getBoardType().c_str());
 }
 
+static void test_parseConfig_only_SDA_pin() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["SDA"] = 25;
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL(25, ctrl.getSdaPin());
+  TEST_ASSERT_EQUAL(5, ctrl.getSclPin()); // Default
+}
+
+static void test_parseConfig_only_SCL_pin() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["SCL"] = 26;
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL(4, ctrl.getSdaPin()); // Default
+  TEST_ASSERT_EQUAL(26, ctrl.getSclPin());
+}
+
+static void test_parseConfig_only_board_type() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["board"] = "sparkfun";
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL_STRING("sparkfun", ctrl.getBoardType().c_str());
+}
+
+static void test_parseConfig_only_i2c_address() {
+  FakeUsbPdChip chip;
+  USBPDController ctrl(chip);
+
+  DynamicJsonDocument doc(256);
+  doc["i2cAddress"] = 0x28;
+
+  ctrl.__test_applyConfig(doc.as<JsonVariant>());
+
+  TEST_ASSERT_EQUAL_UINT8(0x28, ctrl.getI2cAddress());
+}
+
 void register_usb_pd_controller_tests() {
   RUN_TEST(test_module_metadata);
   RUN_TEST(test_isPDBoardConnected_reflects_probe);
   RUN_TEST(test_readPDConfig_reconnect_failure_returns_false);
   RUN_TEST(test_readPDConfig_success_updates_cache);
   RUN_TEST(test_readPDConfig_core_read_failure);
+  RUN_TEST(test_readPDConfig_reconnects_when_disconnected);
   RUN_TEST(test_setPDConfig_requires_connection);
   RUN_TEST(test_setPDConfig_success_updates_cache);
+  RUN_TEST(test_setPDConfig_calls_delay_on_success);
   RUN_TEST(test_getAllPDOProfiles_behaviour);
   RUN_TEST(test_routes_built_and_sizes);
   RUN_TEST(test_pdStatusHandler_builds_json);
@@ -313,6 +395,10 @@ void register_usb_pd_controller_tests() {
   RUN_TEST(test_parseConfig_with_null_config);
   RUN_TEST(test_parseConfig_with_all_fields);
   RUN_TEST(test_parseConfig_invalid_board_type_fallback);
+  RUN_TEST(test_parseConfig_only_SDA_pin);
+  RUN_TEST(test_parseConfig_only_SCL_pin);
+  RUN_TEST(test_parseConfig_only_board_type);
+  RUN_TEST(test_parseConfig_only_i2c_address);
 }
 
 #endif // NATIVE_PLATFORM

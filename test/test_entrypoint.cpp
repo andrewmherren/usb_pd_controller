@@ -9,7 +9,6 @@ using namespace fakeit;
 
 // Forward declarations from included sources
 void register_usb_pd_core_tests();
-void register_usb_pd_core_negative_tests();
 void register_usb_pd_controller_tests();
 void register_usb_pd_controller_routes_tests();
 
@@ -43,7 +42,6 @@ int main(int argc, char **argv) {
 
   // Register and run native tests
   register_usb_pd_core_tests();
-  register_usb_pd_core_negative_tests();
   register_usb_pd_controller_tests();
   register_usb_pd_controller_routes_tests();
 

@@ -167,6 +167,45 @@ static void test_pdStatusHandler_reconnection_path() {
   TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
 }
 
+static void test_pdStatusHandler_disconnected_shows_message() {
+  FakeUsbPdChip chip;
+  chip.present = false;
+  USBPDController ctrl(chip);
+  
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+  
+  StaticJsonDocument<256> doc;
+  deserializeJson(doc, res.getContent());
+  
+  // Should have error message (lines 303-309)
+  TEST_ASSERT_FALSE(doc["connected"].as<bool>());
+  TEST_ASSERT_FALSE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(doc.containsKey("message"));
+  TEST_ASSERT_EQUAL_STRING("PD board not connected", doc["message"].as<const char*>());
+}
+
+static void test_pdStatusHandler_connected_but_no_values() {
+  FakeUsbPdChip chip;
+  chip.present = true;
+  chip.volt[chip.getPdoNumber()] = 0.0f; // Force values not read
+  USBPDController ctrl(chip);
+  
+  WebRequestCore req;
+  WebResponseCore res;
+  ctrl.pdStatusHandler(req, res);
+  
+  StaticJsonDocument<256> doc;
+  deserializeJson(doc, res.getContent());
+  
+  // Should show connected but with message about values (lines 305-307)
+  TEST_ASSERT_TRUE(doc["connected"].as<bool>());
+  TEST_ASSERT_FALSE(doc["success"].as<bool>());
+  TEST_ASSERT_TRUE(doc.containsKey("message"));
+  TEST_ASSERT_NOT_EQUAL(-1, String(doc["message"].as<const char*>()).indexOf("initialized"));
+}
+
 static void test_pdoProfilesHandler_connected_lists_pdos() {
   FakeUsbPdChip chip;
   chip.present = true;
@@ -317,6 +356,8 @@ void register_usb_pd_controller_routes_tests() {
   RUN_TEST(test_pdoProfilesHandler_disconnected_503);
   RUN_TEST(test_pdStatusHandler_json_fields_when_connected);
   RUN_TEST(test_pdStatusHandler_reconnection_path);
+  RUN_TEST(test_pdStatusHandler_disconnected_shows_message);
+  RUN_TEST(test_pdStatusHandler_connected_but_no_values);
   RUN_TEST(test_pdoProfilesHandler_connected_lists_pdos);
   RUN_TEST(test_pdoProfilesHandler_complete_profile_data);
   // setPDConfig
