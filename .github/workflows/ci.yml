@@ -29,7 +29,8 @@ jobs:
       - name: Setup Python & PlatformIO
         run: |
           sudo apt update
-          sudo apt install -y gcc g++ make python3-pip lcov unzip wget gcovr
+          # Minimal toolchain + gcovr + unzip/wget for scanners
+          sudo apt install -y gcc g++ make python3-pip unzip wget gcovr
           pip3 install platformio
 
       - name: Setup SonarScanner
@@ -54,28 +55,8 @@ jobs:
           mkdir -p test-results
           $BUILD_WRAPPER_PATH --out-dir bw-output pio test -e test_native --junit-output-path test-results/results.xml || true
 
-      - name: Generate coverage data
+      - name: Generate coverage (SonarQube generic)
         run: |
-          # Remove previous .gcov files
-          find . -name "*.gcov" -delete
-          # Run gcov from repo root for all .gcno files
-          find .pio/build/test_native -name "*.gcno" -exec gcov -b -l -p -c {} \;
-          # Generate coverage.xml (Cobertura) AND sonarqube.xml (generic) for src and include only using identical filters
-          gcovr --xml-pretty \
-            --root $GITHUB_WORKSPACE \
-            --object-directory .pio/build/test_native \
-            --filter "^src/" --filter "^include/" \
-            --exclude-throw-branches \
-            --exclude-directories ".*libdeps.*" \
-            --exclude ".*FakeIt.*" \
-            --exclude ".*Arduino.*" \
-            --exclude ".*unity.*" \
-            --exclude "/usr/include/.*" \
-            --exclude-lines-by-pattern ".*#ifdef (ARDUINO|ESP_PLATFORM).*" \
-            --exclude-lines-by-pattern ".*#if defined\((ARDUINO|ESP_PLATFORM)\).*" \
-            --exclude-unreachable-branches \
-            -o coverage.xml \
-            --print-summary
           gcovr --sonarqube sonarqube.xml \
             --root $GITHUB_WORKSPACE \
             --object-directory .pio/build/test_native \
@@ -108,7 +89,6 @@ jobs:
             -Dsonar.coverage.exclusions=**/test/**/* \
             -Dsonar.cfamily.compile-commands=bw-output/compile_commands.json \
             -Dsonar.coverageReportPaths=sonarqube.xml \
-            -Dsonar.cfamily.gcov.reportsPath=. \
             -Dsonar.cpp.file.suffixes=.cpp,.h,.hpp \
             -Dsonar.c.file.suffixes=.c \
             -Dsonar.verbose=false \
@@ -123,22 +103,11 @@ jobs:
           path: test-results/results.xml
           reporter: java-junit
 
-      - name: Generate AI-ready uncovered snippets
-        run: |
-          echo "Generating uncovered-snippets.jsonl for AI assistants..."
-          python3 tools/extract_uncovered.py --coverage coverage.xml \
-            --root $GITHUB_WORKSPACE --out uncovered-snippets.jsonl --context 4 --max-block 50
-          ls -l uncovered-snippets.jsonl || true
+      # Uncovered snippets generation removed
 
-      - name: Upload uncovered snippets artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: uncovered-snippets
-          path: uncovered-snippets.jsonl
-
-      # Optional: Upload coverage.xml as an artifact for debugging
-      # - name: Upload coverage report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: coverage-report
-      #     path: coverage.xml
+  # Optional: Upload sonarqube.xml as an artifact for debugging
+  # - name: Upload coverage report
+  #   uses: actions/upload-artifact@v4
+  #   with:
+  #     name: coverage-report
+  #     path: sonarqube.xml
