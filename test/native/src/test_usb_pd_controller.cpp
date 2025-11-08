@@ -315,6 +315,24 @@ static void test_handle_check_after_30_seconds_no_change() {
   TEST_ASSERT_FALSE(ctrl.isPdBoardConnected());
 }
 
+  static void test_handle_connected_stays_connected() {
+    FakeUsbPdChip chip;
+    chip.present = true;
+    USBPDController ctrl(chip);
+    When(Method(ArduinoFake(), delay)).AlwaysReturn();
+  
+    // Connect initially
+    TEST_ASSERT_TRUE(ctrl.readPDConfig());
+    TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  
+    // Fast-forward past interval and check again - should stay connected (line 80)
+    When(Method(ArduinoFake(), millis)).Return(31001, 31001);
+    ctrl.handle();
+  
+    // Still connected, no state change
+    TEST_ASSERT_TRUE(ctrl.isPdBoardConnected());
+  }
+
 static void test_handle_disconnect_detected() {
   FakeUsbPdChip chip;
   chip.present = true;
@@ -756,6 +774,7 @@ void register_usb_pd_controller_tests() {
   // handle() timing and state
   RUN_TEST(test_handle_early_return_due_to_interval);
   RUN_TEST(test_handle_check_after_30_seconds_no_change);
+    RUN_TEST(test_handle_connected_stays_connected);
   RUN_TEST(test_handle_disconnect_detected);
   RUN_TEST(test_handle_reconnection_detected);
   
