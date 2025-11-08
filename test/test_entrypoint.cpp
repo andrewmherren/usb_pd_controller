@@ -10,7 +10,6 @@ using namespace fakeit;
 // Forward declarations from included sources
 void register_usb_pd_core_tests();
 void register_usb_pd_controller_tests();
-void register_usb_pd_controller_routes_tests();
 
 // Global provider that persists across tests (but gets reset in setUp)
 static MockWebPlatformProvider *globalProvider = nullptr;
@@ -43,7 +42,6 @@ int main(int argc, char **argv) {
   // Register and run native tests
   register_usb_pd_core_tests();
   register_usb_pd_controller_tests();
-  register_usb_pd_controller_routes_tests();
 
   UNITY_END();
 
