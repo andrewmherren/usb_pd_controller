@@ -60,7 +60,7 @@ jobs:
           find . -name "*.gcov" -delete
           # Run gcov from repo root for all .gcno files
           find .pio/build/test_native -name "*.gcno" -exec gcov -b -l -p -c {} \;
-          # Generate coverage.xml for src and include only
+          # Generate coverage.xml (Cobertura) AND sonarqube.xml (generic) for src and include only using identical filters
           gcovr --xml-pretty \
             --root $GITHUB_WORKSPACE \
             --object-directory .pio/build/test_native \
@@ -76,6 +76,19 @@ jobs:
             --exclude-unreachable-branches \
             -o coverage.xml \
             --print-summary
+          gcovr --sonarqube sonarqube.xml \
+            --root $GITHUB_WORKSPACE \
+            --object-directory .pio/build/test_native \
+            --filter "^src/" --filter "^include/" \
+            --exclude-throw-branches \
+            --exclude-directories ".*libdeps.*" \
+            --exclude ".*FakeIt.*" \
+            --exclude ".*Arduino.*" \
+            --exclude ".*unity.*" \
+            --exclude "/usr/include/.*" \
+            --exclude-lines-by-pattern ".*#ifdef (ARDUINO|ESP_PLATFORM).*" \
+            --exclude-lines-by-pattern ".*#if defined\((ARDUINO|ESP_PLATFORM)\).*" \
+            --exclude-unreachable-branches
 
       - name: Fix shallow clone for SonarCloud
         run: |
@@ -94,8 +107,8 @@ jobs:
             -Dsonar.exclusions=**/build-wrapper-dump.json \
             -Dsonar.coverage.exclusions=**/test/**/* \
             -Dsonar.cfamily.compile-commands=bw-output/compile_commands.json \
+            -Dsonar.coverageReportPaths=sonarqube.xml \
             -Dsonar.cfamily.gcov.reportsPath=. \
-            -Dsonar.cfamily.gcov.xmlReportPaths=coverage.xml \
             -Dsonar.cpp.file.suffixes=.cpp,.h,.hpp \
             -Dsonar.c.file.suffixes=.c \
             -Dsonar.verbose=false \

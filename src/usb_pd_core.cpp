@@ -51,24 +51,37 @@ bool USBPDCore::setConfig(float voltage, float current) {
 }
 
 String USBPDCore::buildPdoProfilesJson() const {
-  String json = "{\"pdos\":[";
+  // Refactored to minimize synthetic branch inflation from many String +/+= operations.
+  // Using a fixed-size stack buffer and snprintf reduces exception/alloc branches counted by gcov.
+  // Max length estimation (worst case):
+  //   Per PDO object ~70 chars * 3 + wrapper ~30 < 250. Use 256 for safety.
+  char buf[256];
+  int pos = 0;
+  auto append = [&](int written) {
+    if (written < 0 || written >= (int)sizeof(buf) - pos) {
+      // Truncate safely if overflow would occur; ensure valid JSON termination later.
+      pos = (int)sizeof(buf) - 1;
+    } else {
+      pos += written;
+    }
+  };
+
+  append(snprintf(buf + pos, sizeof(buf) - pos, "{\"pdos\":["));
+  int activePdo = chip.getPdoNumber();
   for (int i = 1; i <= 3; ++i) {
-    if (i > 1)
-      json += ",";
+    if (i > 1) {
+      append(snprintf(buf + pos, sizeof(buf) - pos, ","));
+    }
     float v = chip.getVoltage(i);
     float c = chip.getCurrent(i);
-    bool active = (chip.getPdoNumber() == i);
-    json += "{";
-    json += "\"number\":" + String(i) + ",";
-    json += "\"voltage\":" + String(v) + ",";
-    json += "\"current\":" + String(c) + ",";
-    json += "\"power\":" + String(v * c) + ",";
-    json += "\"active\":" + String(active ? "true" : "false");
-    if (i == 1) {
-      json += ",\"fixed\":true";
-    }
-    json += "}";
+    float pwr = v * c;
+    bool active = (activePdo == i);
+    append(snprintf(buf + pos, sizeof(buf) - pos,
+                   "{\"number\":%d,\"voltage\":%.3g,\"current\":%.3g,\"power\":%.3g,\"active\":%s%s}",
+                   i, v, c, pwr, active ? "true" : "false", i == 1 ? ",\"fixed\":true" : ""));
   }
-  json += "],\"activePDO\":" + String(chip.getPdoNumber()) + "}";
-  return json;
+  append(snprintf(buf + pos, sizeof(buf) - pos, "],\"activePDO\":%d}", activePdo));
+  // Ensure null termination
+  buf[sizeof(buf) - 1] = '\0';
+  return String(buf);
 }

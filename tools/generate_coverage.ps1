@@ -93,7 +93,8 @@ if (-not $gcovrPath) {
 }
 
 $coverageXmlPath = Join-Path $coverageRoot "coverage.xml"
-$summaryPath = Join-Path $coverageRoot "summary.txt"
+$sonarXmlPath    = Join-Path $coverageRoot "sonarqube.xml"
+$summaryPath     = Join-Path $coverageRoot "summary.txt"
 
 # EXCLUDE platform-specific code (#ifdef ARDUINO/ESP_PLATFORM)
 gcovr --xml-pretty `
@@ -116,6 +117,21 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $coverageXmlPath)) {
     Write-Host "`nFailed to generate coverage report!" -ForegroundColor Red
     exit 1
 }
+
+# Also generate SonarQube generic coverage report for CI ingestion
+gcovr --sonarqube $sonarXmlPath `
+    --root $libRoot `
+    --object-directory (Join-Path $libRoot ".pio/build/test_native") `
+    --filter "^src/" --filter "^include/" `
+    --exclude-throw-branches `
+    --exclude-directories ".*libdeps.*" `
+    --exclude ".*FakeIt.*" `
+    --exclude ".*Arduino.*" `
+    --exclude ".*unity.*" `
+    --exclude "/usr/include/.*" `
+    --exclude-lines-by-pattern ".*#ifdef (ARDUINO|ESP_PLATFORM).*" `
+    --exclude-lines-by-pattern ".*#if defined\((ARDUINO|ESP_PLATFORM)\).*" `
+    --exclude-unreachable-branches | Out-Null
 
 # ---------------------------------------------------------------------------
 # Step 5: Display summary
