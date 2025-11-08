@@ -1,9 +1,7 @@
-# Local Coverage Generation Script
-# Replicates SonarCloud CI coverage generation locally
-# Outputs everything into a .coverage folder at the library root.
-# Usage examples:
-#   powershell -NoLogo -ExecutionPolicy Bypass -File .\tools\generate_coverage.ps1
-#   powershell -NoLogo -ExecutionPolicy Bypass -File .\tools\generate_coverage.ps1 -Html
+# Native Coverage Generation Script
+# Generates coverage for NATIVE-TESTABLE code only (excludes platform-specific code)
+# This matches what CI/SonarCloud reports
+# Usage: .\tools\generate_native_coverage.ps1 [-Html] [-NoHtml]
 
 [CmdletBinding()]
 param(
@@ -12,62 +10,58 @@ param(
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Local Coverage Generation for SonarCloud" -ForegroundColor Cyan
+Write-Host "Native Coverage (Platform-Independent)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 # ---------------------------------------------------------------------------
-# Resolve paths relative to this script so it works from any CWD
+# Resolve paths relative to this script
 # ---------------------------------------------------------------------------
 $scriptDir = Split-Path -Path $PSCommandPath -Parent
-$libRoot   = Split-Path -Path $scriptDir -Parent  # tools/ -> lib root
+$libRoot   = Split-Path -Path $scriptDir -Parent
 
 # ---------------------------------------------------------------------------
-# Step 1: Prepare .coverage workspace (clean previous artifacts)
+# Step 1: Prepare .coverage/native workspace
 # ---------------------------------------------------------------------------
-Write-Host "`n[1/6] Preparing .coverage workspace..." -ForegroundColor Yellow
-$coverageRoot = Join-Path $libRoot ".coverage"
+Write-Host "`n[1/6] Preparing .coverage/native workspace..." -ForegroundColor Yellow
+$coverageRoot = Join-Path $libRoot ".coverage\native"
 if (Test-Path $coverageRoot) {
     Remove-Item -LiteralPath $coverageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 New-Item -ItemType Directory -Path $coverageRoot | Out-Null
 $gcovDestDir = Join-Path $coverageRoot "gcov"
 New-Item -ItemType Directory -Path $gcovDestDir | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $coverageRoot "raw") | Out-Null
 
-# Clean build to ensure fresh instrumentation
+# Clean build
 Remove-Item (Join-Path $libRoot ".pio\build\test_native") -Recurse -ErrorAction SilentlyContinue
 Get-ChildItem -Path $libRoot -Recurse -Filter "*.gcda" -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
 Get-ChildItem -Path $libRoot -Recurse -Filter "*.gcov" -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
 
 # ---------------------------------------------------------------------------
-# Step 2: Build and run tests
+# Step 2: Build and run native tests
 # ---------------------------------------------------------------------------
-Write-Host "`n[2/6] Building and running tests..." -ForegroundColor Yellow
+Write-Host "`n[2/6] Building and running native tests..." -ForegroundColor Yellow
 
-# Prefer pio from PATH; fall back to user-specific path if needed
 $pioCmd = (Get-Command pio -ErrorAction SilentlyContinue)
 if (-not $pioCmd) {
     $fallbackPio = "C:\\Users\\Drew\\.platformio\\penv\\Scripts\\pio.exe"
     if (Test-Path $fallbackPio) {
         $pioCmd = $fallbackPio
     } else {
-        Write-Host "PlatformIO (pio) not found on PATH and fallback path missing." -ForegroundColor Red
-        Write-Host "Please install PlatformIO and ensure 'pio' is available." -ForegroundColor Yellow
+        Write-Host "PlatformIO (pio) not found." -ForegroundColor Red
         exit 1
     }
 }
 
-$origLoc = Get-Location
 Push-Location $libRoot
 & $pioCmd test -e test_native
 Pop-Location
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "`nTests failed! Fix test failures before checking coverage." -ForegroundColor Red
+    Write-Host "`nTests failed!" -ForegroundColor Red
     exit 1
 }
 
 # ---------------------------------------------------------------------------
-# Step 3: Run gcov to generate .gcov files
+# Step 3: Run gcov
 # ---------------------------------------------------------------------------
 Write-Host "`n[3/6] Running gcov on instrumented files..." -ForegroundColor Yellow
 $gcnoFiles = Get-ChildItem -Path (Join-Path $libRoot ".pio\build\test_native") -Filter "*.gcno" -Recurse -ErrorAction SilentlyContinue
@@ -88,9 +82,9 @@ Get-ChildItem -Path $libRoot -Recurse -Filter "*.gcov" -ErrorAction SilentlyCont
 Write-Host "  Generated coverage for $gcovCount source files" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# Step 4: Generate coverage.xml using gcovr
+# Step 4: Generate coverage report (EXCLUDE platform-specific code)
 # ---------------------------------------------------------------------------
-Write-Host "`n[4/6] Generating coverage.xml report..." -ForegroundColor Yellow
+Write-Host "`n[4/6] Generating native coverage report..." -ForegroundColor Yellow
 
 $gcovrPath = Get-Command gcovr -ErrorAction SilentlyContinue
 if (-not $gcovrPath) {
@@ -101,10 +95,11 @@ if (-not $gcovrPath) {
 $coverageXmlPath = Join-Path $coverageRoot "coverage.xml"
 $summaryPath = Join-Path $coverageRoot "summary.txt"
 
+# EXCLUDE platform-specific code (#ifdef ARDUINO/ESP_PLATFORM)
 gcovr --xml-pretty `
     --root $libRoot `
     --object-directory (Join-Path $libRoot ".pio/build/test_native") `
-    --filter "src" --filter "include" `
+    --filter "^src/" --filter "^include/" `
     --exclude-throw-branches `
     --exclude-directories ".*libdeps.*" `
     --exclude ".*FakeIt.*" `
@@ -125,11 +120,11 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $coverageXmlPath)) {
 # ---------------------------------------------------------------------------
 # Step 5: Display summary
 # ---------------------------------------------------------------------------
-Write-Host "`n[5/6] Coverage report generated!" -ForegroundColor Green
+Write-Host "`n[5/6] Native coverage report generated!" -ForegroundColor Green
 Write-Host "`nCoverage artifacts:" -ForegroundColor Cyan
-Write-Host "  - .coverage/coverage.xml (Sonar-compatible XML)" -ForegroundColor White
-Write-Host "  - .coverage/summary.txt (human-readable summary)" -ForegroundColor White
-Write-Host "  - .coverage/gcov/*.gcov (line-by-line raw coverage)" -ForegroundColor White
+Write-Host "  - .coverage/native/coverage.xml" -ForegroundColor White
+Write-Host "  - .coverage/native/summary.txt" -ForegroundColor White
+Write-Host "  - .coverage/native/gcov/*.gcov" -ForegroundColor White
 
 $coverageXml = [xml](Get-Content $coverageXmlPath)
 $lineCoverage = $coverageXml.coverage.'line-rate'
@@ -138,10 +133,20 @@ $linePercent = [math]::Round([double]$lineCoverage * 100, 1)
 $branchPercent = [math]::Round([double]$branchCoverage * 100, 1)
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "Coverage Summary:" -ForegroundColor Cyan
+Write-Host "Native Coverage Summary:" -ForegroundColor Cyan
 Write-Host "  Line Coverage:   $linePercent%" -ForegroundColor $(if ($linePercent -ge 80) { "Green" } else { "Yellow" })
 Write-Host "  Branch Coverage: $branchPercent%" -ForegroundColor $(if ($branchPercent -ge 80) { "Green" } else { "Yellow" })
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  (Excludes platform-specific #ifdef ARDUINO/ESP_PLATFORM code)" -ForegroundColor DarkGray
+
+# Display per-file breakdown
+Write-Host "`nPer-File Coverage:" -ForegroundColor Cyan
+$parseScript = Join-Path $scriptDir "parse_coverage.ps1"
+if (Test-Path $parseScript) {
+    & $parseScript -CoverageXmlPath $coverageXmlPath
+} else {
+    Write-Host "  (parse_coverage.ps1 not found)" -ForegroundColor Yellow
+}
 
 # ---------------------------------------------------------------------------
 # Step 6: Optional HTML report
@@ -154,29 +159,28 @@ if (-not $NoHtml) {
         $doHtml = ($response -eq 'y' -or $response -eq 'Y')
     }
     if ($doHtml) {
-    Write-Host "Generating HTML report..." -ForegroundColor Yellow
-    $htmlPath = Join-Path $coverageRoot "coverage.html"
-    gcovr --html-details $htmlPath `
-        --root $libRoot `
-        --object-directory (Join-Path $libRoot ".pio/build/test_native") `
-        --filter "src" --filter "include" `
-        --exclude-throw-branches `
-        --exclude-directories ".*libdeps.*" `
-        --exclude ".*FakeIt.*" `
-        --exclude ".*Arduino.*" `
-        --exclude ".*unity.*" `
-        --exclude-unreachable-branches | Out-Null
+        Write-Host "Generating HTML report..." -ForegroundColor Yellow
+        $htmlPath = Join-Path $coverageRoot "coverage.html"
+        gcovr --html-details $htmlPath `
+            --root $libRoot `
+            --object-directory (Join-Path $libRoot ".pio/build/test_native") `
+            --filter "^src/" --filter "^include/" `
+            --exclude-throw-branches `
+            --exclude-directories ".*libdeps.*" `
+            --exclude ".*FakeIt.*" `
+            --exclude ".*Arduino.*" `
+            --exclude ".*unity.*" `
+            --exclude-lines-by-pattern ".*#ifdef (ARDUINO|ESP_PLATFORM).*" `
+            --exclude-lines-by-pattern ".*#if defined\((ARDUINO|ESP_PLATFORM)\).*" `
+            --exclude-unreachable-branches | Out-Null
         if (Test-Path $htmlPath) {
-            Write-Host "HTML report generated: .coverage/coverage.html" -ForegroundColor Green
+            Write-Host "HTML report: .coverage/native/coverage.html" -ForegroundColor Green
             Write-Host "Opening in browser..." -ForegroundColor Yellow
             Start-Process $htmlPath
         }
     }
 }
 
-Write-Host "`n[6/6] All artifacts written to .coverage" -ForegroundColor Green
-Write-Host "`nDone! You can now:" -ForegroundColor Cyan
-Write-Host "  1. View .coverage/coverage.xml in VS Code with Coverage Gutters extension" -ForegroundColor White
-Write-Host "  2. Check .coverage/gcov/*.gcov for line-by-line coverage details" -ForegroundColor White
-Write-Host "  3. Open .coverage/coverage.html for a detailed HTML report" -ForegroundColor White
-Write-Host "  4. Compare with SonarCloud report" -ForegroundColor White
+Write-Host "`n[6/6] All artifacts written to .coverage/native" -ForegroundColor Green
+Write-Host "`nThis shows coverage for platform-independent code testable in native environment." -ForegroundColor Cyan
+Write-Host "For platform-specific code coverage, use generate_esp32_coverage.ps1" -ForegroundColor Cyan

@@ -60,11 +60,11 @@ jobs:
           find . -name "*.gcov" -delete
           # Run gcov from repo root for all .gcno files
           find .pio/build/test_native -name "*.gcno" -exec gcov -b -l -p -c {} \;
-          # Generate coverage.xml for src and include
+          # Generate coverage.xml for src and include only
           gcovr --xml-pretty \
             --root $GITHUB_WORKSPACE \
             --object-directory .pio/build/test_native \
-            --filter "src|include" \
+            --filter "^src/" --filter "^include/" \
             --exclude-throw-branches \
             --exclude-directories ".*libdeps.*" \
             --exclude ".*FakeIt.*" \
@@ -92,7 +92,7 @@ jobs:
             -Dsonar.sources=src,include \
             -Dsonar.tests=test \
             -Dsonar.exclusions=**/build-wrapper-dump.json \
-            -Dsonar.coverage.exclusions=**/test/**/*,**/libdeps/**/*,**/.github/**/* \
+            -Dsonar.coverage.exclusions=**/test/**/* \
             -Dsonar.cfamily.compile-commands=bw-output/compile_commands.json \
             -Dsonar.cfamily.gcov.reportsPath=. \
             -Dsonar.cfamily.gcov.xmlReportPaths=coverage.xml \
