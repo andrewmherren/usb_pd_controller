@@ -58,4 +58,3 @@ LOCAL_*
 .continue/
 compile_commands.json
 .coverage/
-include/version_autogen.h
