@@ -5,8 +5,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <interface/auth_types.h>
-#include <interface/core/web_request_core.h>
-#include <interface/core/web_response_core.h>
+#include <interface/request_response_types.h>
 #include <interface/openapi_factory.h>
 #include <interface/openapi_types.h>
 #include <interface/utils/route_variant.h>
@@ -56,14 +55,7 @@ public:
   // Get all PDO profiles as JSON string
   String getAllPDOProfiles();
 
-  // Platform-specific request/response typedefs for unified handlers
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
-  using RequestT = WebRequest;
-  using ResponseT = WebResponse;
-#else
-  using RequestT = WebRequestCore;
-  using ResponseT = WebResponseCore;
-#endif
+  // RequestT/ResponseT are provided by <interface/request_response_types.h>
 
   // Route handler methods (unified signatures)
   void mainPageHandler(RequestT &req, ResponseT &res);
