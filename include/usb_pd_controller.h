@@ -15,6 +15,7 @@
 #include <usb_pd_core.h>
 #include <utility>
 #include <web_platform_interface.h>
+#include "version_autogen.h"
 
 // DEFAULT macro conflict handling not needed now that SparkFun headers are
 // isolated behind an adapter
@@ -33,7 +34,12 @@ public:
   std::vector<RouteVariant> getHttpRoutes() override;
   std::vector<RouteVariant> getHttpsRoutes() override;
   String getModuleName() const override { return "USB PD Controller"; }
-  String getModuleVersion() const override { return "0.1.0"; }
+  // Version must be injected at build time from library.json as WEB_MODULE_VERSION_STR
+  // via PlatformIO extra_script. Intentionally fail build if missing.
+#ifndef WEB_MODULE_VERSION_STR
+#error "WEB_MODULE_VERSION_STR not defined (version_autogen.h missing)."
+#endif
+  String getModuleVersion() const override { return WEB_MODULE_VERSION_STR; }
   String getModuleDescription() const override {
     return "USB-C Power Delivery voltage and current control";
   }

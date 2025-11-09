@@ -13,7 +13,7 @@ static void test_module_metadata() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
   TEST_ASSERT_EQUAL_STRING("USB PD Controller", ctrl.getModuleName().c_str());
-  TEST_ASSERT_EQUAL_STRING("0.1.0", ctrl.getModuleVersion().c_str());
+  TEST_ASSERT_EQUAL_STRING(WEB_MODULE_VERSION_STR, module.getModuleVersion().c_str());
   TEST_ASSERT_TRUE_MESSAGE(ctrl.getModuleDescription().length() > 0,
                            "Description should be non-empty");
 }
