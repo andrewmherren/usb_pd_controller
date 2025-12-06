@@ -18,7 +18,7 @@
     "dependencies": {
         "bblanchon/ArduinoJson": "^6.20.0",
         "SparkFun_STUSB4500_Arduino_Library": "https://github.com/sparkfun/SparkFun_STUSB4500_Arduino_Library.git",
-        "web_platform_interface": "https://github.com/andrewmherren/web_platform_interface.git#cpp_arduino"
+        "web_platform_interface": "https://github.com/andrewmherren/web_platform_interface.git"
     },
     "frameworks": "*",
     "platforms": [
