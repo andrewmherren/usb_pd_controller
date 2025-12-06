@@ -3,26 +3,31 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <SparkFun_STUSB4500.h>
 #include <Wire.h>
-#include <web_platform.h>
+#include <interface/auth_types.h>
+#include <interface/request_response_types.h>
+#include <interface/openapi_factory.h>
+#include <interface/openapi_types.h>
+#include <interface/utils/route_variant.h>
+#include <interface/web_module_interface.h>
+#include <usb_pd_chip.h>
+#include <usb_pd_core.h>
+#include <utility>
+#include <web_platform_interface.h>
+#include "version_autogen.h"
 
+// Compile-time check: ensure version was injected
+#ifndef WEB_MODULE_VERSION_STR
+#error "WEB_MODULE_VERSION_STR not defined (version_autogen.h missing)."
+#endif
 
-// Forward declaration of WebPlatform (from web_platform.h)
-extern class WebPlatform webPlatform;
-
-// Handle DEFAULT definition conflicts with SparkFun library
-// The SparkFun STUSB4500 library defines DEFAULT as 0xFF in
-// stusb4500_register_map.h We need to be careful with any DEFAULT definitions
-// in the Arduino core
-#pragma push_macro("DEFAULT")
-
-// Restore the original DEFAULT definition if it existed
-#pragma pop_macro("DEFAULT")
+// DEFAULT macro conflict handling not needed now that SparkFun headers are
+// isolated behind an adapter
 
 class USBPDController : public IWebModule {
 public:
-  USBPDController(); // Initialize the PD controller
+  // Initialize the PD controller with a chip implementation
+  explicit USBPDController(IUsbPdChip &chip);
 
   // Module lifecycle methods (IWebModule interface)
   void begin() override;
@@ -33,7 +38,7 @@ public:
   std::vector<RouteVariant> getHttpRoutes() override;
   std::vector<RouteVariant> getHttpsRoutes() override;
   String getModuleName() const override { return "USB PD Controller"; }
-  String getModuleVersion() const override { return "0.1.0"; }
+  String getModuleVersion() const override { return WEB_MODULE_VERSION_STR; }
   String getModuleDescription() const override {
     return "USB-C Power Delivery voltage and current control";
   }
@@ -50,16 +55,33 @@ public:
   // Get all PDO profiles as JSON string
   String getAllPDOProfiles();
 
-  // Route handler methods
-  void mainPageHandler(WebRequest &req, WebResponse &res);
-  void pdStatusHandler(WebRequest &req, WebResponse &res);
-  void availableVoltagesHandler(WebRequest &req, WebResponse &res);
-  void availableCurrentsHandler(WebRequest &req, WebResponse &res);
-  void pdoProfilesHandler(WebRequest &req, WebResponse &res);
-  void setPDConfigHandler(WebRequest &req, WebResponse &res);
+  // RequestT/ResponseT are provided by <interface/request_response_types.h>
+
+  // Route handler methods (unified signatures)
+  void mainPageHandler(RequestT &req, ResponseT &res);
+  void pdStatusHandler(RequestT &req, ResponseT &res);
+  void availableVoltagesHandler(RequestT &req, ResponseT &res);
+  void availableCurrentsHandler(RequestT &req, ResponseT &res);
+  void pdoProfilesHandler(RequestT &req, ResponseT &res);
+  void setPDConfigHandler(RequestT &req, ResponseT &res);
+
+  // Lightweight accessors for testing and diagnostics
+  float getCurrentVoltage() const { return currentVoltage; }
+  float getCurrentCurrent() const { return currentCurrent; }
+  bool isPdBoardConnected() const { return pdBoardConnected; }
+  int getSdaPin() const { return sdaPin; }
+  int getSclPin() const { return sclPin; }
+  const String &getBoardType() const { return boardType; }
+  uint8_t getI2cAddress() const { return i2cAddress; }
+
+#if defined(NATIVE_PLATFORM)
+  // Test-only helper to apply configuration without initializing hardware
+  void __test_applyConfig(const JsonVariant &config) { parseConfig(config); }
+#endif
 
 private:
-  STUSB4500 pdController;
+  IUsbPdChip &pdController;
+  USBPDCore core;
 
   // Current PD settings
   float currentVoltage = 0.0;
@@ -76,6 +98,13 @@ private:
   // Initialize I2C and hardware with configuration
   void initializeHardware();
   void parseConfig(const JsonVariant &config);
+
+  // Helper to reduce platform lookup duplication when creating JSON responses
+  template <typename Fn>
+  inline void respondJson(ResponseT &res, Fn &&fn) {
+    IWebPlatformProvider::getPlatformInstance().createJsonResponse(
+        res, std::forward<Fn>(fn));
+  }
 };
 
 // Global instance
