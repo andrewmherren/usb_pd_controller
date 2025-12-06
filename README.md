@@ -398,13 +398,13 @@ void loop() {
 }
 ```
 
-## WebPlatform Module Ecosystem
+## Related Projects
 
-The USB PD Controller is part of the growing WebPlatform module ecosystem:
-
-- **[Web Platform](https://github.com/andrewmherren/web_platform)**: Core framework with authentication, routing, and web services
-- **[Maker API](https://github.com/andrewmherren/maker_api)**: Interactive API documentation and testing interface
-- **USB PD Controller**: This module - USB-C Power Delivery control and monitoring
+- **[web_platform](https://github.com/andrewmherren/web_platform)**: Core WebPlatform implementation
+- **[web_platform_interface](https://github.com/andrewmherren/web_platform_interface)**: Core interface and testing library for WebPlatform ecosystem
+- **[maker_api](https://github.com/andrewmherren/maker_api)**: Interactive API explorer module
+- **[ota_update](https://github.com/andrewmherren/ota_update)**: Over-the-air firmware update module
+- **[web_module_example](https://github.com/andrewmherren/web_module_example)**: Boilerplate template for creating custom WebPlatform modules
 
 ## Memory Efficiency
 
