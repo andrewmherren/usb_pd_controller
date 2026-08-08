@@ -84,6 +84,10 @@ jobs:
 
       - name: SonarCloud Scan
         run: |
+          # sonar-scanner-cli 5.0.1.3006 bundles its own (unsupported) JRE and
+          # prefers it over JAVA_HOME/PATH; force it to use the Java 21 set up
+          # above instead.
+          export SONAR_SCANNER_JAVA_PATH="$JAVA_HOME/bin/java"
           sonar-scanner \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
