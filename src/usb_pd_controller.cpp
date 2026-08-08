@@ -340,11 +340,11 @@ void USBPDController::pdoProfilesHandler(RequestT &req,
 
   // Return all PDO profiles with active PDO indicator
   respondJson(res, [&](JsonObject &json) {
-    JsonArray pdos = json.createNestedArray("pdos");
+    JsonArray pdos = json["pdos"].to<JsonArray>();
 
     // Build PDO profiles directly from chip data
     for (int i = 1; i <= 3; ++i) {
-      JsonObject pdo = pdos.createNestedObject();
+      JsonObject pdo = pdos.add<JsonObject>();
       float v = pdController.getVoltage(i);
       float c = pdController.getCurrent(i);
       bool active = (pdController.getPdoNumber() == i);
@@ -366,7 +366,7 @@ void USBPDController::pdoProfilesHandler(RequestT &req,
 void USBPDController::setPDConfigHandler(RequestT &req,
                                          ResponseT &res) {
   // Parse JSON from request body
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   DeserializationError error = deserializeJson(doc, req.getBody());
 
   if (error) {
@@ -427,18 +427,18 @@ void USBPDController::parseConfig(const JsonVariant &config) {
   }
 
   // Parse I2C pin configuration
-  if (config.containsKey("SDA")) {
+  if (!config["SDA"].isNull()) {
     sdaPin = config["SDA"].as<int>();
     DEBUG_PRINTF("USB PD Controller: Configured SDA pin: %d\n", sdaPin);
   }
 
-  if (config.containsKey("SCL")) {
+  if (!config["SCL"].isNull()) {
     sclPin = config["SCL"].as<int>();
     DEBUG_PRINTF("USB PD Controller: Configured SCL pin: %d\n", sclPin);
   }
 
   // Parse board type
-  if (config.containsKey("board")) {
+  if (!config["board"].isNull()) {
     boardType = config["board"].as<const char *>();
     DEBUG_PRINTF("USB PD Controller: Configured board type: %s\n",
                  boardType.c_str());
@@ -453,7 +453,7 @@ void USBPDController::parseConfig(const JsonVariant &config) {
   }
 
   // Parse I2C address if provided
-  if (config.containsKey("i2cAddress")) {
+  if (!config["i2cAddress"].isNull()) {
     i2cAddress = config["i2cAddress"].as<uint8_t>();
     DEBUG_PRINTF("USB PD Controller: Configured I2C address: 0x%02X\n",
                  i2cAddress);
