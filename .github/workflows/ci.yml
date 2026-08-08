@@ -41,9 +41,15 @@ jobs:
 
       - name: Setup SonarScanner
         run: |
-          wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-          unzip sonar-scanner-cli-5.0.1.3006-linux.zip
-          echo "$PWD/sonar-scanner-5.0.1.3006-linux/bin" >> $GITHUB_PATH
+          # 5.0.1.3006 (previously pinned here) predates SonarSource's JRE
+          # auto-provisioning (added in 6.0) and just uses whatever Java it
+          # finds baked into the archive - neither JAVA_HOME nor
+          # SONAR_SCANNER_JAVA_PATH override that for it. 8.1.0.6389
+          # auto-provisions its own compatible JRE at analysis time, which
+          # is what actually fixes "Java 17 no longer supported".
+          wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-8.1.0.6389-linux-x64.zip
+          unzip sonar-scanner-cli-8.1.0.6389-linux-x64.zip
+          echo "$PWD/sonar-scanner-8.1.0.6389-linux-x64/bin" >> $GITHUB_PATH
 
       - name: Setup Build Wrapper
         run: |
@@ -84,10 +90,6 @@ jobs:
 
       - name: SonarCloud Scan
         run: |
-          # sonar-scanner-cli 5.0.1.3006 bundles its own (unsupported) JRE and
-          # prefers it over JAVA_HOME/PATH; force it to use the Java 21 set up
-          # above instead.
-          export SONAR_SCANNER_JAVA_PATH="$JAVA_HOME/bin/java"
           sonar-scanner \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
