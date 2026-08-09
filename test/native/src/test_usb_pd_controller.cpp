@@ -146,11 +146,11 @@ static void test_pdStatusHandler_builds_json() {
   ctrl.pdStatusHandler(req, res);
   TEST_ASSERT_EQUAL_STRING("application/json", res.getMimeType().c_str());
   auto content = res.getContent();
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   DeserializationError err = deserializeJson(doc, content);
   TEST_ASSERT_FALSE_MESSAGE(err, "JSON parse error");
-  TEST_ASSERT_TRUE(doc.containsKey("connected"));
-  TEST_ASSERT_TRUE(doc.containsKey("success"));
+  TEST_ASSERT_FALSE(doc["connected"].isNull());
+  TEST_ASSERT_FALSE(doc["success"].isNull());
 }
 
 static void test_parseConfig_updates_fields_via_test_helper() {
@@ -158,7 +158,7 @@ static void test_parseConfig_updates_fields_via_test_helper() {
   chip.present = false; // Avoid performing begin success path
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["SDA"] = 21;
   doc["SCL"] = 22;
   doc["board"] = "unknown"; // should fallback to sparkfun
@@ -188,10 +188,10 @@ static void test_availableVoltagesHandler_lists_values() {
   WebRequestCore req;
   WebResponseCore res;
   ctrl.availableVoltagesHandler(req, res);
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE_MESSAGE(err, "Voltages JSON parse error");
-  TEST_ASSERT_TRUE(doc.containsKey("voltages"));
+  TEST_ASSERT_FALSE(doc["voltages"].isNull());
   JsonArray arr = doc["voltages"].as<JsonArray>();
   TEST_ASSERT_EQUAL(5, arr.size());
 }
@@ -202,10 +202,10 @@ static void test_availableCurrentsHandler_lists_values() {
   WebRequestCore req;
   WebResponseCore res;
   ctrl.availableCurrentsHandler(req, res);
-  StaticJsonDocument<512> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE_MESSAGE(err, "Currents JSON parse error");
-  TEST_ASSERT_TRUE(doc.containsKey("currents"));
+  TEST_ASSERT_FALSE(doc["currents"].isNull());
   JsonArray arr = doc["currents"].as<JsonArray>();
   TEST_ASSERT_TRUE(arr.size() >= 9);
 }
@@ -240,7 +240,7 @@ static void test_begin_with_config_variant() {
   When(Method(ArduinoFake(), millis)).AlwaysReturn(0);
   When(Method(ArduinoFake(), delay)).AlwaysReturn();
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["SDA"] = 21;
   doc["SCL"] = 22;
   doc["i2cAddress"] = 0x29;
@@ -379,13 +379,13 @@ static void test_pdStatusHandler_json_fields_when_connected() {
   WebResponseCore res;
   ctrl.pdStatusHandler(req, res);
   
-  StaticJsonDocument<512> doc;
+  JsonDocument doc;
   deserializeJson(doc, res.getContent());
   
-  TEST_ASSERT_TRUE(doc.containsKey("success"));
-  TEST_ASSERT_TRUE(doc.containsKey("connected"));
-  TEST_ASSERT_TRUE(doc.containsKey("voltage"));
-  TEST_ASSERT_TRUE(doc.containsKey("current"));
+  TEST_ASSERT_FALSE(doc["success"].isNull());
+  TEST_ASSERT_FALSE(doc["connected"].isNull());
+  TEST_ASSERT_FALSE(doc["voltage"].isNull());
+  TEST_ASSERT_FALSE(doc["current"].isNull());
   TEST_ASSERT_TRUE(doc["success"].as<bool>());
   TEST_ASSERT_TRUE(doc["connected"].as<bool>());
   TEST_ASSERT_EQUAL(9.0, doc["voltage"].as<double>());
@@ -405,7 +405,7 @@ static void test_pdStatusHandler_reconnection_path() {
   WebResponseCore res;
   ctrl.pdStatusHandler(req, res);
   
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   deserializeJson(doc, res.getContent());
   
   TEST_ASSERT_TRUE(doc["connected"].as<bool>());
@@ -422,12 +422,12 @@ static void test_pdStatusHandler_disconnected_shows_message() {
   WebResponseCore res;
   ctrl.pdStatusHandler(req, res);
   
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   deserializeJson(doc, res.getContent());
   
   TEST_ASSERT_FALSE(doc["connected"].as<bool>());
   TEST_ASSERT_FALSE(doc["success"].as<bool>());
-  TEST_ASSERT_TRUE(doc.containsKey("message"));
+  TEST_ASSERT_FALSE(doc["message"].isNull());
   TEST_ASSERT_EQUAL_STRING("PD board not connected", doc["message"].as<const char*>());
 }
 
@@ -441,12 +441,12 @@ static void test_pdStatusHandler_connected_but_no_values() {
   WebResponseCore res;
   ctrl.pdStatusHandler(req, res);
   
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   deserializeJson(doc, res.getContent());
   
   TEST_ASSERT_TRUE(doc["connected"].as<bool>());
   TEST_ASSERT_FALSE(doc["success"].as<bool>());
-  TEST_ASSERT_TRUE(doc.containsKey("message"));
+  TEST_ASSERT_FALSE(doc["message"].isNull());
   TEST_ASSERT_NOT_EQUAL(-1, String(doc["message"].as<const char*>()).indexOf("initialized"));
 }
 
@@ -458,7 +458,7 @@ static void test_pdoProfilesHandler_disconnected_503() {
   WebResponseCore res;
   ctrl.pdoProfilesHandler(req, res);
   TEST_ASSERT_EQUAL(503, res.getStatus());
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   TEST_ASSERT_FALSE(doc["success"].as<bool>());
@@ -473,13 +473,13 @@ static void test_pdoProfilesHandler_connected_lists_pdos() {
   WebRequestCore req;
   WebResponseCore res;
   ctrl.pdoProfilesHandler(req, res);
-  StaticJsonDocument<1024> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
-  TEST_ASSERT_TRUE(doc.containsKey("pdos"));
+  TEST_ASSERT_FALSE(doc["pdos"].isNull());
   JsonArray pdos = doc["pdos"].as<JsonArray>();
   TEST_ASSERT_EQUAL(3, pdos.size());
-  TEST_ASSERT_TRUE(doc.containsKey("activePDO"));
+  TEST_ASSERT_FALSE(doc["activePDO"].isNull());
 }
 
 static void test_pdoProfilesHandler_complete_profile_data() {
@@ -498,7 +498,7 @@ static void test_pdoProfilesHandler_complete_profile_data() {
   WebRequestCore req;
   WebResponseCore res;
   ctrl.pdoProfilesHandler(req, res);
-  StaticJsonDocument<2048> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   JsonArray pdos = doc["pdos"].as<JsonArray>();
@@ -513,7 +513,7 @@ static void test_pdoProfilesHandler_complete_profile_data() {
   JsonObject pdo2 = pdos[1];
   TEST_ASSERT_EQUAL(2, pdo2["number"].as<int>());
   TEST_ASSERT_TRUE(pdo2["active"].as<bool>());
-  TEST_ASSERT_FALSE(pdo2.containsKey("fixed"));
+  TEST_ASSERT_TRUE(pdo2["fixed"].isNull());
   TEST_ASSERT_EQUAL(2, doc["activePDO"].as<int>());
 }
 
@@ -602,7 +602,7 @@ static void test_setPDConfigHandler_success_200() {
   req.setBody("{\"voltage\":12,\"current\":2}");
   ctrl.setPDConfigHandler(req, res);
   TEST_ASSERT_EQUAL(200, res.getStatus());
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   TEST_ASSERT_TRUE(doc["success"].as<bool>());
@@ -620,7 +620,7 @@ static void test_setPDConfigHandler_parse_current_field() {
   req.setBody("{\"voltage\":9.0,\"current\":1.5}");
   ctrl.setPDConfigHandler(req, res);
   TEST_ASSERT_EQUAL(200, res.getStatus());
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   TEST_ASSERT_TRUE(doc["success"].as<bool>());
@@ -639,11 +639,11 @@ static void test_setPDConfigHandler_failure_returns_500() {
   req.setBody("{\"voltage\":12.0,\"current\":2.0}");
   ctrl.setPDConfigHandler(req, res);
   TEST_ASSERT_EQUAL(500, res.getStatus());
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   auto err = deserializeJson(doc, res.getContent());
   TEST_ASSERT_FALSE(err);
   TEST_ASSERT_FALSE(doc["success"].as<bool>());
-  TEST_ASSERT_TRUE(doc.containsKey("error"));
+  TEST_ASSERT_FALSE(doc["error"].isNull());
 }
 
 static void test_readPDConfig_when_disconnected_returns_false() {
@@ -671,7 +671,7 @@ static void test_parseConfig_with_all_fields() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["SDA"] = 21;
   doc["SCL"] = 22;
   doc["board"] = "sparkfun";
@@ -689,7 +689,7 @@ static void test_parseConfig_invalid_board_type_fallback() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["board"] = "invalid_board";
 
   ctrl.__test_applyConfig(doc.as<JsonVariant>());
@@ -701,7 +701,7 @@ static void test_parseConfig_only_SDA_pin() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["SDA"] = 25;
 
   ctrl.__test_applyConfig(doc.as<JsonVariant>());
@@ -714,7 +714,7 @@ static void test_parseConfig_only_SCL_pin() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["SCL"] = 26;
 
   ctrl.__test_applyConfig(doc.as<JsonVariant>());
@@ -727,7 +727,7 @@ static void test_parseConfig_only_board_type() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["board"] = "sparkfun";
 
   ctrl.__test_applyConfig(doc.as<JsonVariant>());
@@ -739,7 +739,7 @@ static void test_parseConfig_only_i2c_address() {
   FakeUsbPdChip chip;
   USBPDController ctrl(chip);
 
-  DynamicJsonDocument doc(256);
+  JsonDocument doc;
   doc["i2cAddress"] = 0x28;
 
   ctrl.__test_applyConfig(doc.as<JsonVariant>());
