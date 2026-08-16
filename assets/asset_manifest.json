@@ -1,0 +1,6 @@
+{
+  "usb_pd_styles.css": {
+    "header": "usb_pd_styles.h",
+    "guard": "USB_PD_STYLES_H"
+  }
+}
