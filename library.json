@@ -1,6 +1,6 @@
 {
     "name": "usb_pd_controller",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "description": "USB-C Power Delivery control module for ESP32 with WebPlatform",
     "keywords": "usb-c, power-delivery, pd, stusb4500, voltage, current, control",
     "repository": {
